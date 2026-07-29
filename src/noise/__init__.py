@@ -37,6 +37,15 @@ from .embeddings import (
     load_embeddings,
     save_embeddings,
 )
+from .cleanlab_estimate import (
+    CleanlabConfig,
+    CleanlabResult,
+    compare_elementwise,
+    estimate_transition_matrix,
+    format_comparison,
+    load_hoc_matrix,
+    reduce_probs_to_classes,
+)
 from .hoc_estimate import (
     HOCConfig,
     HOCResult,
@@ -49,6 +58,13 @@ from .hoc_estimate import (
     per_seed_T_long,
     prior_divergence,
     run_hoc_multiseed,
+)
+from .oos_probabilities import (
+    OOSConfig,
+    assert_no_group_leakage,
+    author_grouped_folds,
+    generate_oos_probabilities,
+    load_oos,
 )
 
 __all__ = [
@@ -78,4 +94,16 @@ __all__ = [
     "per_seed_frame",
     "per_seed_T_long",
     "compare_to_reference",
+    "OOSConfig",
+    "author_grouped_folds",
+    "assert_no_group_leakage",
+    "generate_oos_probabilities",
+    "load_oos",
+    "CleanlabConfig",
+    "CleanlabResult",
+    "reduce_probs_to_classes",
+    "estimate_transition_matrix",
+    "load_hoc_matrix",
+    "compare_elementwise",
+    "format_comparison",
 ]

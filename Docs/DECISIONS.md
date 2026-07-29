@@ -94,7 +94,8 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-034 | Clusterability diagnostic results: prediction falsified | ACTIVE | C1 |
 | D-035 | Base-embedding control run to quantify the fine-tuning artifact | ACTIVE | C1 |
 | D-036 | Base-embedding control result and Stage 2 pre-registration | ACTIVE | C1 |
-
+| D-037 | HOC full result: the pre-registered prediction held | ACTIVE | C1 |
+| D-037 | HOC full result: prediction held, estimator internally healthy | ACTIVE | C1 |
 ---
 
 # Part 1 · Scope and framing
@@ -842,6 +843,80 @@ assuming no noise is what a suppressed-disagreement failure looks like.
 **Links.** Fires the D-035 pre-registered rule. Sets the pre-registration for
 Stage 2 (`src/noise/hoc_estimate.py`). The scope correction is implemented in
 `src/noise/clusterability.py` per this entry.
+
+---
+
+## D-037 · HOC full result: the pre-registered prediction held
+**Date:** 2026-07-24 · **Status:** ACTIVE · **Category:** C1
+
+**The D-036 prediction held.** HOC on the fine-tuned embeddings returned diagonal
+entries above 0.85 for all four conditions. The falsifier (bipolar diagonal below
+0.7 with a dominant bipolar-to-depression off-diagonal) did not occur, though the
+direction of the top off-diagonal is bipolar-to-depression as the clinical
+literature predicts. The prediction was recorded in D-036 before this run.
+
+**Mean transition matrix (5 seeds):**
+
+| true \ noisy | bipolar | depression | eating_dis. | schizophrenia |
+|---|---|---|---|---|
+| bipolar | **0.9534** | 0.0263 | 0.0035 | 0.0168 |
+| depression | 0.0025 | 0.9964 | 0.0003 | 0.0008 |
+| eating_disorder | 0.0008 | 0.0039 | 0.9946 | 0.0007 |
+| schizophrenia | 0.0133 | 0.0074 | 0.0012 | 0.9781 |
+
+HOC estimates bipolar label noise at 4.7%, for the condition the clinical
+literature identifies as the most mislabelled of the four.
+
+**The estimator is internally healthy by every check, which is the point.**
+
+- **Stable across seeds.** Per-seed bipolar diagonal: 0.9546, 0.9526, 0.9540,
+  0.9525, 0.9533. Standard deviation 0.0008. This is not a wobbly estimate that
+  more rounds would settle; it is tight and consistent.
+- **Assumptions satisfied.** All five seeds produced a non-singular matrix
+  (determinant 0.922 to 0.925) and every row is diagonally dominant. HOC's own
+  Assumption 1 (invertibility) and Assumption 2 (diagonal dominance) hold, so the
+  result cannot be dismissed on the grounds that its preconditions failed.
+- **Prior recovered almost exactly.** Estimated class prior matches the observed
+  noisy proportions to an L1 divergence of 0.004 (bipolar 0.036 vs 0.038,
+  depression 0.814 vs 0.812, and so on). The estimator is fitting the data it is
+  given correctly.
+
+**Why this is the strongest form of the C1 result.** By every internal diagnostic
+HOC is behaving properly: stable, invertible, diagonally dominant, prior
+recovered. And it returns a bipolar noise rate of 4.7%. This is precisely the
+"clean, confident, no warning sign" failure predicted in D-036. There is no check
+a practitioner could run on HOC's output that would reveal a problem. An estimator
+that were merely broken could be distrusted in general; a competent estimator that
+returns an implausible answer with no signal of trouble is the sharper and more
+dangerous case, and it is the one measured here.
+
+**Correlation with the fine-tuned 2-NN artifact.** HOC's diagonal tracks the
+fine-tuned 2-NN agreement statistic from D-034 at Pearson 0.999, rank order
+identical. This is expected from the mechanism (HOC fits its matrix to 2-NN
+consensus frequencies) and is what converts the correlation from coincidence into
+confirmation: the estimator's output is a deterministic function of a statistic
+that D-036 established is largely a fine-tuning artifact.
+
+**Load-bearing argument, restated.** Do not lead with "4.7% is clinically
+implausible," which is a judgement. Lead with: HOC's output is a deterministic
+function of the 2-NN consensus structure, that structure was measured (D-034,
+D-036) to be substantially manufactured by fine-tuning on the labels being
+estimated, therefore whatever the true noise rate is, HOC cannot be measuring it
+here because its input was manufactured. The clinical implausibility is
+corroboration, not the load-bearing claim.
+
+**Reproduction note.** This run used fresh explicit seeds and reproduced the
+original mean matrix (hoc_mean_T.csv) to within 5e-4, which is Monte Carlo
+variation in the neighbour sampling, consistent with the per-seed spread of the
+same order. The two HOC runs are the same result, not conflicting results.
+
+**Consequence.** The HOC half of the C1 diagnostic is complete and rests on
+measured evidence from this project's own data. Remaining: the cleanlab
+(Confident Learning) estimate, for a second independent estimator. If cleanlab
+also returns a near-identity bipolar row, two independent estimators fail
+identically on this data, which is the strongest form of the result.
+
+**Links.** Confirms the prediction in D-036. Completes the HOC portion of D-030.
 
 ---
 
