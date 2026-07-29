@@ -42,8 +42,12 @@ from .hoc_estimate import (
     HOCResult,
     aggregate_results,
     check_pre_registered_prediction,
+    compare_to_reference,
     estimate_hoc,
     make_clusterable_noisy_data,
+    per_seed_frame,
+    per_seed_T_long,
+    prior_divergence,
     run_hoc_multiseed,
 )
 
@@ -70,4 +74,8 @@ __all__ = [
     "aggregate_results",
     "check_pre_registered_prediction",
     "make_clusterable_noisy_data",
+    "prior_divergence",
+    "per_seed_frame",
+    "per_seed_T_long",
+    "compare_to_reference",
 ]

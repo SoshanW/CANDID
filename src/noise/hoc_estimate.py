@@ -353,6 +353,70 @@ def make_clusterable_noisy_data(
     return features, labels
 
 
+def prior_divergence(p: np.ndarray, conditions: list[str]) -> dict[str, object]:
+    """L1 divergence of an estimated prior from the D-036 observed noisy proportions.
+
+    ``p`` is the estimated TRUE-class prior; the observed noisy proportions are the
+    marginal of the noisy labels. They coincide only when T is the identity, so a
+    large divergence indicates T is far from identity (informative, per D-036).
+    """
+    obs = np.array([OBSERVED_NOISY_PROPORTIONS.get(c, np.nan) for c in conditions])
+    diff = np.abs(np.asarray(p, dtype=float) - obs)
+    return {
+        "per_class_abs_diff": {conditions[i]: float(diff[i]) for i in range(len(conditions))},
+        "l1": float(np.nansum(diff)),
+    }
+
+
+def per_seed_frame(results: list[HOCResult]) -> pd.DataFrame:
+    """One row per seed: per-class T diagonal, prior p, prior L1 divergence, and the
+    Assumption 1/2 flags. Persisted so the per-seed spread and prior never need a
+    re-run again (the gap that prompted this: the old CLI saved only the mean)."""
+    conditions = results[0].conditions
+    rows = []
+    for r in results:
+        row: dict[str, object] = {"seed": r.seed}
+        for i, c in enumerate(conditions):
+            row[f"diag_{c}"] = float(r.diagonal[i])
+        for i, c in enumerate(conditions):
+            row[f"p_{c}"] = float(r.p[i])
+        row["prior_l1_div"] = prior_divergence(r.p, conditions)["l1"]
+        row["nonsingular"] = r.is_nonsingular
+        row["det"] = r.det
+        row["loss"] = r.final_loss
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def per_seed_T_long(results: list[HOCResult]) -> pd.DataFrame:
+    """Long-format per-seed full transition matrices (seed, true, noisy, value), so
+    the seed spread and any derived statistic can be recomputed without re-running."""
+    conditions = results[0].conditions
+    rows = []
+    for r in results:
+        for i, tc in enumerate(conditions):
+            for j, nc in enumerate(conditions):
+                rows.append({"seed": r.seed, "true": tc, "noisy": nc, "value": float(r.T[i, j])})
+    return pd.DataFrame(rows)
+
+
+def compare_to_reference(
+    mean_T: np.ndarray, conditions: list[str], reference_csv: Path, tol: float
+) -> dict[str, object]:
+    """Compare a re-run's mean T to a stored reference matrix (reproducibility check).
+
+    Returns the max absolute element difference and whether it is within ``tol``.
+    The reference is read by ``true_<c>`` row order to stay aligned regardless of how
+    the CSV columns are laid out.
+    """
+    ref = pd.read_csv(reference_csv, index_col=0)
+    ref = ref.reindex(index=[f"true_{c}" for c in conditions],
+                      columns=[f"noisy_{c}" for c in conditions])
+    ref_arr = ref.to_numpy(dtype=float)
+    max_abs_diff = float(np.nanmax(np.abs(mean_T - ref_arr)))
+    return {"max_abs_diff": max_abs_diff, "within_tol": bool(max_abs_diff <= tol), "tol": tol}
+
+
 def format_multiseed(results: list[HOCResult], agg: dict[str, object]) -> str:
     """Human-readable multi-seed report: bipolar row first, then mean+/-std T."""
     conditions = agg["conditions"]
@@ -391,11 +455,16 @@ def format_multiseed(results: list[HOCResult], agg: dict[str, object]) -> str:
         )
 
     lines.append("")
-    lines.append("estimated prior p vs observed noisy marginal (divergence is informative):")
+    lines.append("per-seed diagonal, prior p, and prior L1 divergence vs D-036 observed:")
+    lines.append(per_seed_frame(results).to_string(index=False, float_format=lambda v: f"{v:.4f}"))
+
+    lines.append("")
     mean_p = np.asarray(agg["mean_p"])
+    mean_div = prior_divergence(mean_p, conditions)["l1"]
+    lines.append(f"mean prior p vs observed noisy proportions (mean L1 divergence = {mean_div:.4f}):")
     for i, c in enumerate(conditions):
         obs = OBSERVED_NOISY_PROPORTIONS.get(c, results[0].noisy_marginal[i])
-        lines.append(f"  {c:16s} p={mean_p[i]:.4f}  noisy_marginal={results[0].noisy_marginal[i]:.4f}  (D-036 obs {obs})")
+        lines.append(f"  {c:16s} p={mean_p[i]:.4f}  observed_noisy={obs}")
 
     pred = check_pre_registered_prediction(mean_t, std_t, conditions)
     lines.append("")
@@ -422,6 +491,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--max-iter", type=int, default=HOCConfig().max_iter)
     p.add_argument("--lr", type=float, default=HOCConfig().lr)
     p.add_argument("--out-csv", type=Path, default=None)
+    p.add_argument("--reproduce-tol", type=float, default=5e-3,
+                   help="Max abs element diff for the re-run mean to count as reproducing an "
+                        "existing hoc_mean_T.csv (reproducibility check; non-destructive).")
     return p.parse_args(argv)
 
 
@@ -446,15 +518,47 @@ def main(argv: list[str] | None = None) -> int:
         max_iter=args.max_iter,
         lr=args.lr,
     )
+    print(f"seeds: {args.seeds}   scope: within_e (HOC Algorithm 1; the only mode)   "
+          f"n_rounds={config.n_rounds} sample_size={config.sample_size} "
+          f"max_iter={config.max_iter} lr={config.lr}")
     results = run_hoc_multiseed(features, labels, args.seeds, config)
     agg = aggregate_results(results)
     print(format_multiseed(results, agg))
 
-    out_csv = args.out_csv or (Path(cache_dir) / "hoc_mean_T.csv")
     conditions = agg["conditions"]
-    pd.DataFrame(np.asarray(agg["mean_T"]), index=[f"true_{c}" for c in conditions],
-                 columns=[f"noisy_{c}" for c in conditions]).to_csv(out_csv)
-    print(f"\nWrote mean T -> {out_csv}")
+    out_dir = Path(cache_dir)
+    mean_t = np.asarray(agg["mean_T"])
+
+    def _matrix_frame(arr: np.ndarray) -> pd.DataFrame:
+        return pd.DataFrame(arr, index=[f"true_{c}" for c in conditions],
+                            columns=[f"noisy_{c}" for c in conditions])
+
+    # Reproducibility check against the original mean, if present. Never clobber it:
+    # the re-run's mean is written to a separate file.
+    reference = out_dir / "hoc_mean_T.csv"
+    if reference.exists():
+        cmp = compare_to_reference(mean_t, conditions, reference, args.reproduce_tol)
+        verdict = "PASS" if cmp["within_tol"] else "FAIL"
+        print(f"\nREPRODUCIBILITY vs existing {reference.name}: {verdict}  "
+              f"(max abs diff {cmp['max_abs_diff']:.2e}, tol {cmp['tol']:.1e})")
+        if not cmp["within_tol"]:
+            print("  WARNING: the re-run mean does NOT match the original within tolerance. "
+                  "Something changed between runs (seeds, embeddings, config, or device). "
+                  "Do not trust the recovered spread until this is understood.")
+        mean_out = out_dir / "hoc_mean_T_rerun.csv"
+    else:
+        mean_out = args.out_csv or reference
+
+    _matrix_frame(mean_t).to_csv(mean_out)
+    std_out = out_dir / "hoc_std_T.csv"
+    _matrix_frame(np.asarray(agg["std_T"])).to_csv(std_out)
+    per_seed_out = out_dir / "hoc_per_seed.csv"
+    per_seed_frame(results).to_csv(per_seed_out, index=False)
+    per_seed_T_out = out_dir / "hoc_per_seed_T.csv"
+    per_seed_T_long(results).to_csv(per_seed_T_out, index=False)
+
+    print(f"\nWrote: {mean_out.name}, {std_out.name}, {per_seed_out.name}, "
+          f"{per_seed_T_out.name} -> {out_dir}")
     return 0
 
 

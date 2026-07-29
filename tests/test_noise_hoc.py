@@ -10,13 +10,16 @@ itself is guarded on torch.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.noise.hoc_estimate import (
     HOCConfig,
     _count_consensus,
     check_pre_registered_prediction,
+    compare_to_reference,
     make_clusterable_noisy_data,
+    prior_divergence,
 )
 
 
@@ -67,6 +70,27 @@ def test_check_pre_registered_prediction_branches() -> None:
     assert out2["bipolar"]["dominant_offdiagonal"] == "depression"
 
 
+def test_prior_divergence_zero_and_positive() -> None:
+    conds = ["bipolar", "depression", "eating_disorder", "schizophrenia"]
+    obs = np.array([0.038, 0.812, 0.096, 0.055])
+    assert prior_divergence(obs, conds)["l1"] == pytest.approx(0.0, abs=1e-9)
+    uni = np.full(4, 0.25)
+    assert prior_divergence(uni, conds)["l1"] == pytest.approx(float(np.abs(uni - obs).sum()))
+
+
+def test_compare_to_reference_pass_and_fail(tmp_path) -> None:
+    conds = ["bipolar", "depression"]
+    mean_t = np.array([[0.9, 0.1], [0.05, 0.95]])
+    ref = pd.DataFrame(mean_t, index=["true_bipolar", "true_depression"],
+                       columns=["noisy_bipolar", "noisy_depression"])
+    path = tmp_path / "hoc_mean_T.csv"
+    ref.to_csv(path)
+    ok = compare_to_reference(mean_t, conds, path, tol=1e-6)
+    assert ok["within_tol"] and ok["max_abs_diff"] == pytest.approx(0.0)
+    bad = compare_to_reference(mean_t + 0.02, conds, path, tol=1e-3)
+    assert not bad["within_tol"] and bad["max_abs_diff"] == pytest.approx(0.02)
+
+
 # --- torch-dependent estimator (skips where torch is absent) --------------------
 
 torch = pytest.importorskip("torch")
@@ -74,6 +98,8 @@ torch = pytest.importorskip("torch")
 from src.noise.hoc_estimate import (  # noqa: E402
     aggregate_results,
     estimate_hoc,
+    per_seed_T_long,
+    per_seed_frame,
     run_hoc_multiseed,
 )
 
@@ -127,3 +153,28 @@ def test_multiseed_reports_a_spread() -> None:
     assert np.asarray(agg["mean_T"]).shape == (3, 3)
     assert np.asarray(agg["std_T"]).shape == (3, 3)
     assert agg["n_seeds"] == 3
+
+
+def test_per_seed_outputs_and_reproducibility() -> None:
+    conditions = ["bipolar", "depression", "eating_disorder"]
+    t_true = np.array([[0.7, 0.25, 0.05], [0.03, 0.95, 0.02], [0.04, 0.06, 0.90]])
+    p_true = np.array([0.2, 0.6, 0.2])
+    feats, labels = make_clusterable_noisy_data(t_true, p_true, conditions, n=1200, seed=2)
+    cfg = HOCConfig(n_rounds=4, sample_size=700, max_iter=500)
+
+    r1 = run_hoc_multiseed(feats, labels, [0, 1, 2], cfg)
+    # Reproducibility: identical seeds -> identical matrices (deterministic on CPU).
+    r2 = run_hoc_multiseed(feats, labels, [0, 1, 2], cfg)
+    for a, b in zip(r1, r2):
+        assert np.allclose(a.T, b.T)
+
+    ps = per_seed_frame(r1)
+    assert len(ps) == 3
+    for c in conditions:
+        assert f"diag_{c}" in ps.columns
+        assert f"p_{c}" in ps.columns
+    assert "prior_l1_div" in ps.columns
+
+    long = per_seed_T_long(r1)
+    assert len(long) == 3 * 3 * 3  # seeds * K * K
+    assert set(long.columns) == {"seed", "true", "noisy", "value"}
