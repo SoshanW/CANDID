@@ -68,7 +68,14 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class TrainConfig:
-    """Trainer hyperparameters for the naive baseline fine-tune."""
+    """Trainer hyperparameters for the naive baseline fine-tune.
+
+    ``disable_tqdm`` turns off the per-step progress bar. Set it for long
+    multi-fold jobs launched with ``!python`` from a notebook: tqdm redraws once
+    per training step, and tens of thousands of redraws streamed into a Colab
+    output cell bloat the page until the browser tab freezes. With it off the
+    only progress output is one log line every ``logging_steps`` steps.
+    """
 
     num_epochs: int = 3
     batch_size: int = 16
@@ -77,6 +84,7 @@ class TrainConfig:
     seed: int = 42
     fp16: bool = False
     logging_steps: int = 50
+    disable_tqdm: bool = False
 
 
 @dataclass(frozen=True)

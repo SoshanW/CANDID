@@ -146,6 +146,7 @@ def build_trainer(
         seed=train_config.seed,
         fp16=train_config.fp16,
         logging_steps=train_config.logging_steps,
+        disable_tqdm=train_config.disable_tqdm,
         report_to=[],
         **checkpoint_kwargs,
     )

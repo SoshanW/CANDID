@@ -28,6 +28,14 @@ selection disabled, so the held-out fold never influences the returned model; th
 OOS probabilities come from the final-epoch weights of a model that only saw the
 fold's training rows.
 
+DECISION (quiet by default): k folds x 3 epochs over ~112k rows is ~40k training
+steps, and tqdm redraws the progress bar on every one of them. Launched from Colab
+as ``!python -m src.noise.oos_probabilities``, all of that streams into a single
+notebook output cell, which grows until the browser tab freezes -- the run itself is
+fine, the page is what dies. So this CLI disables tqdm and logs one line every
+``--logging-steps`` steps (a few hundred lines for the whole job). Pass
+``--progress-bars`` to get the bars back in a terminal, where they cost nothing.
+
 Torch/transformers are imported lazily inside the default fit-predict, so the
 config, the fold logic and the assembly/caching stay importable and unit-testable
 without the deep-learning stack (a fake fit-predict is injected in tests). The real
@@ -38,6 +46,7 @@ run is a thin Colab/Kaggle job that clones the repo and calls
 from __future__ import annotations
 
 import argparse
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -111,6 +120,29 @@ def assert_no_group_leakage(
                 f"Fold {i}: {len(overlap)} '{group_col}' value(s) on both sides "
                 f"(e.g. {sorted(overlap)[:3]}). Author leakage; folds are invalid."
             )
+
+
+def quiet_hf_logging() -> None:
+    """Silence transformers' info logs and the hub download bars.
+
+    Complements ``TrainConfig.disable_tqdm``: without this, every fold still
+    re-emits the model-loading banners and a download bar per file, which is the
+    other half of what floods a Colab output cell. Best-effort -- import failures
+    are ignored so a missing optional dependency never breaks the run.
+    """
+    try:
+        from transformers.utils import logging as hf_logging
+
+        hf_logging.set_verbosity_error()
+        hf_logging.disable_progress_bar()
+    except Exception:  # pragma: no cover - depends on transformers version
+        pass
+    try:
+        from huggingface_hub.utils import disable_progress_bars
+
+        disable_progress_bars()
+    except Exception:  # pragma: no cover - depends on hub version
+        pass
 
 
 def _default_fit_predict(
@@ -234,7 +266,16 @@ def _run_or_resume_fold(
                 print(f"[fold {fold}] resumed from cache")
                 return np.load(probs_path)
 
+    # One timestamped line per fold: with tqdm off this is the coarse heartbeat that
+    # says the job is alive, and it survives in a log file after the session drops.
+    start = time.time()
+    print(
+        f"[fold {fold}] start {time.strftime('%H:%M:%S')} -- "
+        f"train {len(train_idx)} rows, predict {len(val_idx)} rows",
+        flush=True,
+    )
     val_probs = fit_predict(df.iloc[train_idx], df.iloc[val_idx])
+    print(f"[fold {fold}] done in {(time.time() - start) / 60:.1f} min", flush=True)
     val_probs = np.asarray(val_probs, dtype=np.float64)
     if val_probs.shape != (len(val_idx), n_classes):
         raise ValueError(
@@ -300,6 +341,10 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=TrainConfig().batch_size)
     p.add_argument("--fp16", action="store_true")
     p.add_argument("--model-name", type=str, default=ModelConfig().pretrained_name)
+    p.add_argument("--logging-steps", type=int, default=200,
+                   help="Steps between loss log lines (higher = quieter; default 200).")
+    p.add_argument("--progress-bars", action="store_true",
+                   help="Re-enable tqdm/HF bars. Terminal only -- they freeze Colab output cells.")
     return p.parse_args(argv)
 
 
@@ -316,8 +361,17 @@ def main(argv: list[str] | None = None) -> int:
         df = _load_training_frame(args.data_root)
         print(f"Rebuilt {args.split} split from data ({len(df)} rows)")
 
+    if not args.progress_bars:
+        quiet_hf_logging()
+
     model_config = ModelConfig(pretrained_name=args.model_name)
-    train_config = TrainConfig(num_epochs=args.num_epochs, batch_size=args.batch_size, fp16=args.fp16)
+    train_config = TrainConfig(
+        num_epochs=args.num_epochs,
+        batch_size=args.batch_size,
+        fp16=args.fp16,
+        logging_steps=args.logging_steps,
+        disable_tqdm=not args.progress_bars,
+    )
     oos_config = OOSConfig(n_folds=args.n_folds)
     cache_dir = _default_oos_dir(artifacts, args.split)
 
