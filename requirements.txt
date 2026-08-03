@@ -13,3 +13,11 @@ transformers==5.14.1  # pinned to the tested version; keep in sync with the Cola
 accelerate>=0.26.0
 scikit-learn>=1.4
 numpy>=1.24
+
+# --- C1 noise estimation ---
+# cleanlab is the SECOND independent transition-matrix estimator (Confident
+# Learning), used by src/noise/cleanlab_estimate.py. Capped below 3 because the
+# code calls the v2 API (cleanlab.count.estimate_py_and_noise_matrices_from_
+# probabilities). Pure-python deps (numpy/pandas/scikit-learn/termcolor/tqdm), so
+# it is safe to install into a Colab runtime without disturbing the CUDA torch.
+cleanlab>=2.6,<3
