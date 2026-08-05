@@ -920,6 +920,78 @@ identically on this data, which is the strongest form of the result.
 
 ---
 
+## D-038 · Cleanlab cross-validation fold integrity verified
+**Date:** 2026-07-24 · **Status:** ACTIVE · **Category:** C1
+
+**Decision context.** The cleanlab (Confident Learning) estimate is the second
+independent estimator in the C1 diagnostic. Its out-of-sample probabilities are
+only valid if author-grouping holds across folds (D-010), because author style
+leakage would inflate the probabilities and silently corrupt the estimated
+transition matrix.
+
+**Verification.** The fold assignment was checked directly. Across 111,892 posts
+and 99,749 unique authors, zero authors appear in more than one fold. Per-fold
+condition proportions match within roughly half a percentage point (bipolar
+0.0372 to 0.0380, depression 0.8092 to 0.8144). Three folds, evenly sized at
+~37,300 posts each. Posts per author average 1.12, maximum 8.
+
+**Consequence.** The cleanlab out-of-sample probabilities are not contaminated by
+author leakage. Whatever transition matrix cleanlab returns can be compared
+against the HOC result (D-037) as a genuinely independent estimate. The mandatory
+group-integrity test (D-010) passed.
+
+**Links.** Depends on D-010. Sets up the cleanlab-vs-HOC comparison that completes
+the C1 diagnostic.
+
+---
+
+## D-039 · Cleanlab result: agrees with HOC on structure, contradicts on magnitude
+**Date:** 2026-07-24 · **Status:** ACTIVE · **Category:** C1
+
+**Result.** Cleanlab (Confident Learning) on author-grouped out-of-sample
+probabilities (folds verified clean, D-038) returned:
+
+| true \ noisy | bipolar | depression | eating_dis. | schizophrenia | implied noise |
+|---|---|---|---|---|---|
+| bipolar | 0.8483 | 0.1027 | 0.0062 | 0.0429 | 15.2% |
+| depression | 0.0093 | 0.9790 | 0.0041 | 0.0076 | 2.1% |
+| eating_disorder | 0.0017 | 0.0277 | 0.9685 | 0.0022 | 3.2% |
+| schizophrenia | 0.0326 | 0.0638 | 0.0048 | 0.8988 | 10.1% |
+
+**Agreement with HOC (D-037), on structure.** Both estimators rank the conditions
+identically (depression most reliable, then eating disorder, schizophrenia,
+bipolar). Diagonal Pearson correlation 0.982. Both identify bipolar as the
+noisiest condition and both place bipolar's dominant off-diagonal leak into
+depression, the clinically predicted direction.
+
+**Disagreement with HOC, on magnitude.** Cleanlab estimates roughly three times
+more noise throughout. Bipolar: HOC 4.7 percent, cleanlab 15.2 percent.
+Schizophrenia: HOC 2.2 percent, cleanlab 10.1 percent. HOC's estimate carries a
+tight cross-seed confidence region (bipolar diagonal std 0.0008) that would
+exclude cleanlab's estimate; cleanlab provides a single point with no region.
+
+**Interpretation, stated carefully.** This is not the "both estimators flatline to
+near-identity" outcome. Cleanlab's 15 percent for bipolar is more clinically
+plausible than HOC's 4.7 percent. The C1 claim is therefore not "the estimators
+agree on an implausible answer." It is the sharper and more defensible claim that
+two independent data-driven estimators, both internally healthy and both producing
+confident output with no error signal, disagree by a factor of three on the noise
+magnitude, and there is no data-internal way to adjudicate between them. Neither
+supplies the confidence region that Sesia's Theorem 4 requires, and they are
+mutually incompatible on where that region would sit. This is the situation that
+motivates supplying the region from clinical knowledge (C2).
+
+**Anticipated objection.** Since cleanlab's bipolar estimate is closer to
+clinically plausible, does data-driven estimation "work" after all? No: cleanlab
+gives a point estimate with no region, HOC gives a tight region that excludes it,
+and nothing internal to either method indicates which is correct. Confident mutual
+contradiction is a failure to identify the matrix, not a success.
+
+**Links.** Compares against D-037. Depends on D-038. Completes the two-estimator
+C1 diagnostic.
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
