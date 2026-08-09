@@ -94,8 +94,10 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-034 | Clusterability diagnostic results: prediction falsified | ACTIVE | C1 |
 | D-035 | Base-embedding control run to quantify the fine-tuning artifact | ACTIVE | C1 |
 | D-036 | Base-embedding control result and Stage 2 pre-registration | ACTIVE | C1 |
-| D-037 | HOC full result: the pre-registered prediction held | ACTIVE | C1 |
 | D-037 | HOC full result: prediction held, estimator internally healthy | ACTIVE | C1 |
+| D-038 | Cleanlab cross-validation fold integrity verified | ACTIVE | C1 |
+| D-039 | Cleanlab result: agrees with HOC on structure, contradicts on magnitude | ACTIVE | C1 |
+| D-040 | HOC on representations not trained on the project's labels (pre-registration) | ACTIVE | C1 |
 ---
 
 # Part 1 · Scope and framing
@@ -685,7 +687,10 @@ Liu take the feature extractor from a model trained to near-100% training
 accuracy on the noisy labels. Running HOC on base embeddings would handicap it
 unfairly and would not be a fair test of the method.
 
-**Links.** Controls for the confound identified in D-034.
+**Links.** Controls for the confound identified in D-034. D-040 adds a separate,
+sanctioned arm that runs HOC on non-fine-tuned extractors; it asks a different
+question (does the failure survive the prescribed remedy?) and does **not** reverse
+the protocol decision recorded here.
 
 ---
 
@@ -992,6 +997,188 @@ C1 diagnostic.
 
 ---
 
+## D-040 · HOC on representations not trained on the project's labels (PRE-REGISTRATION)
+**Date:** 2026-08-09 · **Status:** ACTIVE · **Category:** C1
+
+**Decision.** An additional two-arm HOC run was pre-registered, on feature
+extractors that have never been trained on this project's noisy proxy labels, to
+test whether the D-037 result survives the remedy the identifiability literature
+prescribes for exactly that failure.
+
+**Everything below this line was written before any Arm A or Arm B number was
+produced, and committed before the first estimation was run.** That ordering is
+the reason D-036 and D-037 are defensible, and it is the reason this entry exists
+as a separate record rather than as a preamble to its own results (which are in
+D-041).
+
+---
+
+### The question
+
+Does HOC's output on this data change materially when the feature extractor is
+**not** trained on the project's noisy proxy labels?
+
+### Context: a fourth identifiability route this project had not addressed
+
+Liu, Cheng and Zhang (2023, ICML, PMLR 202) has now been read in full. It
+documents **four** routes to an identifiable noise-transition matrix, not the
+three this project had been working from: multiple conditionally independent noisy
+labels, anchor points, clusterability, and **disentangled informative features**
+(their Theorem 5.5). The fourth was unaddressed here.
+
+Their Section 6 tests it. Table 1 estimates T on CIFAR-10 with the HOC estimator
+over three feature extractors, and the ordering is why this matters:
+
+| Encoder | asymm. 0.3 error | asymm. 0.4 error |
+|---|---|---|
+| Weakly supervised (cross-entropy on the noisy labels) | 14.51 | 15.2 |
+| SimCLR (self-supervised) | 4.42 | 4.41 |
+| IPIRM (disentangled) | 3.73 | 3.74 |
+
+They describe the first row as the standard protocol used by forward correction
+and by HOC itself, and note that because its training data is noisy there is no
+guarantee the resulting features are disentangled. **That first row is D-035's
+protocol, and it is the worst of the three.**
+
+### Relationship to D-035: this is an additional arm, not a reversal
+
+D-035 states that HOC must run on fine-tuned embeddings because that matches
+HOC's own published protocol, and that running it on base embeddings would
+handicap the method unfairly. That reasoning is sound **for the question D-035
+asks**, which is whether HOC-as-published works on this data. D-037 answered that
+question.
+
+It does not settle a different question: whether HOC's failure **survives the
+remedy the identifiability literature prescribes for it**. D-035 stays ACTIVE and
+its text is unchanged. D-040 is a distinct experiment with a distinct question,
+and D-041 will report it as such.
+
+### The arms
+
+Both arms run the **identical HOC configuration used for D-037**, verified against
+the notebook cell that produced it: seeds `0 1 2 3 4`, `n_rounds = 50`,
+`sample_size = 15000`, `max_iter = 1500`, `lr = 0.1`, cosine metric, within-E
+neighbour scope. A configuration difference between arms would make the
+comparison uninterpretable, so no CLI default is accepted without checking it
+matches. Embeddings are cached at fp16 in every arm, as the D-034 and D-036 caches
+already are.
+
+| Arm | Extractor | Trained on this project's labels? | Analogue in Liu et al. Table 1 |
+|---|---|---|---|
+| **Fine-tuned (D-037, already run)** | Milestone 0 MentalBERT checkpoint | yes | row 1, weakly supervised |
+| **A** | Base MentalBERT, `mental/mental-bert-base-uncased` | no | none exactly; masked-LM pretraining only |
+| **B** | `sentence-transformers/all-mpnet-base-v2` | no | approximately row 2, contrastive |
+
+Arm A is free: the base cache already exists at `embeddings/train__base` from the
+D-036 control run, so it needs only a HOC invocation. Arm B needs a fresh
+extraction pass (`--extractor mpnet`, cache `embeddings/train__mpnet`).
+
+### The prediction, stated numerically
+
+**Anchor.** D-037 measured a bipolar diagonal of **0.9534** with a cross-seed
+standard deviation of **0.0008** on the fine-tuned features, `det(T)` between
+0.922 and 0.925, and every row diagonally dominant on all five seeds.
+
+**Predicted.** The bipolar diagonal **falls below 0.70 on Arm A**, most likely
+into the range **0.05 to 0.45**, and `det(T)` degrades well below D-037's 0.92.
+Arm B is predicted to land **between Arm A and the fine-tuned value, and below
+0.85**. The arm-wise Pearson correlation between the HOC diagonal and the 2-NN
+agreement statistic on the same features is predicted to **stay above 0.9**,
+because the prediction rests on that coupling being mechanistic.
+
+**Why this is the prediction the project's own mechanism licenses.** D-037
+recorded that HOC's diagonal tracks the 2-NN agreement statistic at Pearson 0.999.
+D-036 measured within-E base bipolar 2-NN agreement at **26.9%** against 86.7%
+fine-tuned. If the coupling is mechanistic rather than coincidental, the base
+diagonal must fall, and by a lot. There is a degenerate limit worth naming in
+advance: if the base-space consensus approaches independence, so that the
+empirical `c2` approaches the outer product `c1 ⊗ c1`, then a consensus-matching
+optimum is every row of T equal to the noisy marginal, which puts the bipolar
+diagonal near **0.038** and `det(T)` near **zero**.
+
+**This prediction runs against the outcome that would most help C1.** The branch
+predicted below is NARROWED or DEGENERATE, not STRENGTHENED. Recording it that way
+is deliberate: predicting the convenient outcome would make a confirmation
+worthless, and D-034 is on record as the entry where an inconvenient result was
+reported rather than defended.
+
+### The decision rule, set in advance
+
+All thresholds below are fixed as of this entry. `0.85` and `0.70` are carried
+over unchanged from D-036's prediction and falsifier so the family of thresholds
+stays consistent across the C1 entries rather than being retuned per run.
+"Non-singular" for the purposes of this rule means **|det(T)| >= 0.5**, a
+judgement set in advance (D-037 sits at 0.92, a matrix with identical rows sits at
+0). Note that `HOCResult.is_nonsingular` uses a looser `1e-8` numerical guard;
+that flag is a crash detector, not this rule's threshold. "Diagonally dominant"
+means every row satisfies `T[i][i] > 0.5`, which is HOC's own Assumption 2 as
+already implemented.
+
+| Branch | Fires when | Consequence |
+|---|---|---|
+| **STRENGTHENED** | bipolar diagonal **>= 0.85 on every** non-fine-tuned arm, **and** that arm is non-singular, **and** every row is diagonally dominant | The estimator's implausible answer is not an artefact of fine-tuning alone. C1's claim is strengthened and generalised: the failure survives the prescribed fix. |
+| **NARROWED** | bipolar diagonal **< 0.70 on any** arm, **and** that arm is non-singular, **and** every row is diagonally dominant | The fine-tuning-artefact explanation is sufficient. C1's claim narrows to fine-tuned representations specifically, and Chapter 1 must be amended to say so. |
+| **DEGENERATE** | bipolar diagonal **< 0.70** but Assumption 1 or Assumption 2 **fails** on that arm | Estimator collapse, not rescue. Neither of the two branches above fires. Reported as HOC being unable to return a usable matrix on that representation. |
+| **INDETERMINATE** | any arm lands in **[0.70, 0.85]** | Reported as a number, with no strengthening or narrowing claim attached to it. |
+| **DISAGREE** | one arm **>= 0.85** and another **< 0.70** | The third outcome. Reported as disagreement between representations, **not** resolved by picking the more convenient arm. |
+
+**Why the DEGENERATE branch exists.** A low bipolar diagonal is ambiguous between
+two opposite readings: HOC recovering real noise once the suppression is removed,
+or HOC collapsing because the consensus signal has gone. Those look identical in
+the diagonal alone and are separated by `det(T)` and by row diagonal dominance.
+Without this gate the rule would read a collapse as a rescue. The distinction is
+drawn here, before the numbers exist, precisely because it would be unconvincing
+if drawn afterwards.
+
+### The limitation, recorded before the result is known
+
+Liu et al.'s **Definition 5.3** defines disentanglement as the feature components
+being conditionally independent **given the true label Y**. The true labels are
+unavailable on this data, so this property **cannot be verified here by any run**,
+in exactly the way D-035 already records that clusterability cannot be measured
+directly.
+
+**Arm B therefore does not test Theorem 5.5's hypothesis.** It tests a weaker,
+observable proxy: whether HOC's output changes when the extractor is independent
+of the project's noisy labels and was trained with an objective that encourages
+semantic separation. Additionally, `all-mpnet-base-v2` is trained on large-scale
+sentence-pair data, which is not purely self-supervised in SimCLR's sense, so the
+analogy to Liu et al.'s middle row is **approximate**, not exact.
+
+**The claim this experiment can support:** that the failure persists across
+representations which differ in how they were supervised.
+**The claim it cannot support:** that a fully disentangled representation would
+not rescue the estimator.
+
+That wording is to be carried into the thesis verbatim rather than softened.
+
+### Confound bounding what any arm can show
+
+`sample_size` is held fixed at 15,000 across arms, so the neighbour starvation
+recorded in D-036 is **identical across arms** and therefore does not invalidate
+the comparison. It does bound what any arm can show: at |E| = 15,000 a bipolar
+post has roughly 566 same-class candidates to match against, versus roughly 4,221
+in the full split. This is to be stated in D-041 rather than discovered later.
+
+### Consequences
+
+- Commits the project to reporting D-041 whichever branch fires, including the two
+  branches that cost C1 something.
+- Adds a third feature extractor to `src/noise/embeddings.py` and therefore a
+  third embedding cache. The existing D-034 and D-036 caches are untouched.
+- Promotes Liu, Cheng and Zhang (2023) from the "cited but not read in full" table
+  to the verified table, per D-033.
+- Per-seed spread and estimated prior p are written per arm by the existing
+  `per_seed_frame` path, so open item 1's request for the spread is closed for
+  every arm rather than for the fine-tuned one only.
+
+**Links.** Adds an arm alongside D-035, which stays ACTIVE and unreversed. Builds
+on D-036 (the artefact measurement), D-037 (the fine-tuned HOC result and the
+Pearson 0.999 coupling) and D-039 (the second estimator). Results in D-041.
+Applies D-033.
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
@@ -1099,6 +1286,7 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Penso, C., Goldberger, J. and Fetaya, E. (2025) 'Conformal prediction of classifiers with many classes based on noisy labels', COPA, PMLR 266, 1–14 | The elicitable parameterisation (D-028). States that for a general noise matrix "all finite sample correction terms are not effective." |
 | Zhu, Z., Song, Y. and Liu, Y. (2021) 'Clusterability as an alternative to anchor points when learning with noisy labels', ICML, PMLR 139, 12912–12923 | Killed D-024. Theorem 2 gives D-018's arithmetic. |
 | Zhu, Z., Wang, J. and Liu, Y. (2022) 'Beyond images: label noise transition matrix estimation for tasks with lower-quality features', ICML, PMLR 162 | Rescued the project. Evidence for D-030. |
+| Liu, Y., Cheng, H. and Zhang, K. (2023) 'Identifiability of label noise transition matrix', ICML, PMLR 202, 21475–21496 | Underpins D-018. Read in full 2026-08-09: it documents **four** identifiability routes, not three; the fourth (disentangled informative features, Theorem 5.5) prompted D-040. |
 
 ## Key references, cited but NOT yet read in full
 
@@ -1107,7 +1295,6 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Ding et al. (2023, NeurIPS), 'Class-conditional conformal prediction with many classes', arXiv:2306.09335 | One leg of C3's convergence table. |
 | Bortolotti et al. (2025), arXiv:2501.18060 | Bears on D-029. |
 | Einbinder et al. (2024), *JMLR* 25(328), 1–66 | Context-setting only; lower risk. |
-| Liu, Cheng and Zhang (2023, ICML), 'Identifiability of label noise transition matrix', PMLR 202, 21475–21496 | Underpins D-018. In the verified survey but not read cover to cover. |
 
 ---
 

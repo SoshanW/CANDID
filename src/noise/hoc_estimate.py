@@ -7,7 +7,11 @@ fine-tuned features (not the base ones) is deliberate and recorded in DECISIONS.
 D-035: HOC's own protocol takes the extractor from a model trained to near-100%
 training accuracy on the noisy labels, so the fine-tuned features are the fair
 input. There is a pre-registered prediction for this run in D-036: read it before
-interpreting any output.
+interpreting any output. D-040 then adds a SEPARATE, sanctioned pair of arms that
+run this same estimator on extractors never trained on the project's labels (base
+MentalBERT and a sentence encoder), asking the different question of whether the
+D-037 failure survives the remedy the identifiability literature prescribes; that
+does not reverse D-035, and its own pre-registered thresholds are in D-040.
 
 Method (their Algorithm 1). Under 2-NN clusterability a post and its two nearest
 neighbours share a true class i, and their noisy labels are conditionally
@@ -70,6 +74,20 @@ OBSERVED_NOISY_PROPORTIONS: dict[str, float] = {
     "eating_disorder": 0.096,
     "schizophrenia": 0.055,
 }
+
+#: D-040 pre-registered thresholds on the bipolar diagonal. Carried over unchanged
+#: from D-036's prediction (0.85) and falsifier (0.70) so the C1 entries share one
+#: family of thresholds instead of retuning per run. DECISION (frozen before the
+#: run): these are pre-registered. Changing them after seeing an Arm A or Arm B
+#: number would void the whole point of D-040, so treat them as read-only.
+D040_STRENGTHEN_DIAGONAL: float = 0.85
+D040_NARROW_DIAGONAL: float = 0.70
+
+#: D-040's non-singularity bar. HOCResult.is_nonsingular uses a 1e-8 numerical guard,
+#: which only catches an outright crash; the decision rule needs a bar that separates
+#: "HOC recovered real noise" from "HOC collapsed towards identical rows" (det -> 0).
+#: D-037 sits at 0.92. Set in advance, per D-040.
+D040_MIN_ABS_DET: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -328,6 +346,111 @@ def check_pre_registered_prediction(
     }
 
 
+def check_d040_rule(
+    results: list[HOCResult], agg: dict[str, object], extractor: str
+) -> dict[str, object]:
+    """Evaluate the D-040 pre-registered decision rule for ONE arm.
+
+    D-040 fixed the thresholds and the branch definitions before any Arm A or Arm B
+    number existed. This function is the executable form of that table, so the branch
+    is read off the data rather than chosen after looking at it.
+
+    The branches, for a single arm:
+
+    - ``STRENGTHENED_ARM``: bipolar diagonal >= 0.85 with HOC's assumptions intact.
+      The full STRENGTHENED branch needs EVERY non-fine-tuned arm to be in this state,
+      which one invocation cannot see; D-041 combines the arms.
+    - ``NARROWED``: bipolar diagonal < 0.70 with the assumptions intact. HOC recovered
+      substantial noise once the fine-tuning suppression was removed.
+    - ``DEGENERATE``: bipolar diagonal < 0.70 but Assumption 1 or 2 failed. Collapse,
+      not rescue. The low diagonal does NOT count as HOC working.
+    - ``INDETERMINATE``: bipolar diagonal in [0.70, 0.85). Reported, no claim.
+    - ``ASSUMPTIONS_FAILED``: diagonal >= 0.85 but the assumptions failed anyway. Not
+      expected to be reachable (a matrix with every diagonal above 0.85 is strongly
+      diagonally dominant), included so no input silently falls through the table.
+
+    Args:
+        results: the per-seed results for this arm.
+        agg: the output of :func:`aggregate_results` for the same arm.
+        extractor: the arm's extractor label, recorded on the verdict.
+
+    Returns:
+        The branch, the quantities it was decided on, and the cross-arm caveat.
+    """
+    conditions: list[str] = list(agg["conditions"])  # type: ignore[arg-type]
+    mean_t = np.asarray(agg["mean_T"])
+    std_t = np.asarray(agg["std_T"])
+    if "bipolar" not in conditions:
+        return {
+            "branch": "NOT_APPLICABLE",
+            "reason": "no bipolar class in this run; the D-040 rule is defined on the "
+                      "bipolar diagonal.",
+            "extractor": extractor,
+        }
+
+    b = conditions.index("bipolar")
+    diag = float(mean_t[b, b])
+    diag_std = float(std_t[b, b])
+
+    # Assumptions are required to hold on EVERY seed, not on the mean: a rule decided
+    # on an average could pass while individual seeds collapsed.
+    mean_abs_det = float(np.mean([abs(r.det) for r in results]))
+    nonsingular = all(abs(r.det) >= D040_MIN_ABS_DET for r in results)
+    dominant = all(all(r.row_diagonally_dominant.values()) for r in results)
+    assumptions_hold = nonsingular and dominant
+
+    if diag >= D040_STRENGTHEN_DIAGONAL:
+        branch = "STRENGTHENED_ARM" if assumptions_hold else "ASSUMPTIONS_FAILED"
+    elif diag < D040_NARROW_DIAGONAL:
+        branch = "NARROWED" if assumptions_hold else "DEGENERATE"
+    else:
+        branch = "INDETERMINATE"
+
+    return {
+        "branch": branch,
+        "extractor": extractor,
+        "bipolar_diagonal": diag,
+        "bipolar_diagonal_std": diag_std,
+        "mean_abs_det": mean_abs_det,
+        "nonsingular_all_seeds": nonsingular,
+        "diagonally_dominant_all_seeds": dominant,
+        "thresholds": {
+            "strengthen_at_or_above": D040_STRENGTHEN_DIAGONAL,
+            "narrow_below": D040_NARROW_DIAGONAL,
+            "min_abs_det": D040_MIN_ABS_DET,
+        },
+        "cross_arm_note": (
+            "This verdict covers ONE arm. STRENGTHENED requires every non-fine-tuned "
+            "arm to reach STRENGTHENED_ARM; if one arm is >= 0.85 and another is "
+            "< 0.70 the outcome is DISAGREE and is reported as such, not resolved by "
+            "picking an arm. See D-040."
+        ),
+    }
+
+
+def format_d040_verdict(verdict: dict[str, object]) -> str:
+    """Render :func:`check_d040_rule`'s verdict, thresholds first, so a reader can see
+    the rule was fixed in advance rather than fitted to the number."""
+    if verdict["branch"] == "NOT_APPLICABLE":
+        return f"--- D-040 rule: not applicable ({verdict['reason']}) ---"
+    th = verdict["thresholds"]  # type: ignore[index]
+    return "\n".join(
+        [
+            f"--- D-040 pre-registered decision rule [arm: {verdict['extractor']}] ---",
+            f"  thresholds (fixed in D-040, before this run): strengthen >= "
+            f"{th['strengthen_at_or_above']}, narrow < {th['narrow_below']}, "  # type: ignore[index]
+            f"|det| >= {th['min_abs_det']} on every seed",  # type: ignore[index]
+            f"  bipolar diagonal: {verdict['bipolar_diagonal']:.4f} "
+            f"+/- {verdict['bipolar_diagonal_std']:.4f}",
+            f"  mean |det|: {verdict['mean_abs_det']:.4f}   "
+            f"non-singular on all seeds: {verdict['nonsingular_all_seeds']}   "
+            f"diagonally dominant on all seeds: {verdict['diagonally_dominant_all_seeds']}",
+            f"  BRANCH: {verdict['branch']}",
+            f"  {verdict['cross_arm_note']}",
+        ]
+    )
+
+
 def make_clusterable_noisy_data(
     transition: np.ndarray,
     prior: np.ndarray,
@@ -417,12 +540,18 @@ def compare_to_reference(
     return {"max_abs_diff": max_abs_diff, "within_tol": bool(max_abs_diff <= tol), "tol": tol}
 
 
-def format_multiseed(results: list[HOCResult], agg: dict[str, object]) -> str:
-    """Human-readable multi-seed report: bipolar row first, then mean+/-std T."""
+def format_multiseed(
+    results: list[HOCResult], agg: dict[str, object], extractor: str = "finetuned"
+) -> str:
+    """Human-readable multi-seed report: bipolar row first, then mean+/-std T.
+
+    ``extractor`` names the feature set in the header so a D-040 arm's output can
+    never be mistaken for the D-037 fine-tuned run when it is pasted into the thesis.
+    """
     conditions = agg["conditions"]
     mean_t = np.asarray(agg["mean_T"])
     std_t = np.asarray(agg["std_T"])
-    lines: list[str] = ["=== HOC transition matrix estimate (fine-tuned embeddings) ==="]
+    lines: list[str] = [f"=== HOC transition matrix estimate [extractor: {extractor}] ==="]
     lines.append(f"conditions (row=true, col=noisy): {conditions}")
     lines.append(f"seeds: {[r.seed for r in results]}")
 
@@ -468,6 +597,10 @@ def format_multiseed(results: list[HOCResult], agg: dict[str, object]) -> str:
 
     pred = check_pre_registered_prediction(mean_t, std_t, conditions)
     lines.append("")
+    if extractor != "finetuned":
+        lines.append("--- NOTE: the D-036 block below pre-registers the FINE-TUNED arm (D-037). "
+                     f"This run is the '{extractor}' arm, which is governed by D-040's own "
+                     "pre-registered thresholds, printed separately. ---")
     lines.append("--- D-036 pre-registered prediction (read the entry; report raw result first) ---")
     lines.append(f"  prediction (all diagonals >= 0.85) holds: {pred['prediction_holds']}")
     lines.append(f"  falsifier (bipolar diag < 0.7 and dominant off-diagonal = depression) met: {pred['falsifier_met']}")
@@ -481,8 +614,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="HOC transition-matrix estimator (Stage 2, C1).")
     p.add_argument("--artifacts-root", type=Path, default=None)
     p.add_argument("--embeddings-dir", type=Path, default=None,
-                   help="FINE-TUNED embeddings cache (default <Models>/embeddings/<split>). "
-                        "Do NOT point this at base embeddings (D-035).")
+                   help="Embeddings cache (default <Models>/embeddings/<split>, the FINE-TUNED "
+                        "one). Pointing this at a non-fine-tuned cache is only sanctioned as a "
+                        "D-040 arm; pass --d040-arm to say so.")
+    p.add_argument("--d040-arm", action="store_true",
+                   help="Declare this run as a D-040 arm: HOC on an extractor never trained on "
+                        "this project's labels, asking whether the D-037 failure survives the "
+                        "remedy the identifiability literature prescribes. Changes the "
+                        "non-fine-tuned warning from 'you are substituting for the D-037 "
+                        "protocol' to 'this is the sanctioned arm', and prints the D-040 "
+                        "pre-registered decision rule against the result. Read D-040 first.")
     p.add_argument("--split", type=str, default="train")
     p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4],
                    help="RNG seeds; >=5 recommended (report the spread, D-030/D-036).")
@@ -507,9 +648,34 @@ def main(argv: list[str] | None = None) -> int:
 
     features, metadata = load_embeddings(cache_dir)
     extractor = str(metadata["extractor"].iloc[0]) if "extractor" in metadata.columns and len(metadata) else "unknown"
-    if extractor == "base":
-        print("WARNING: these embeddings are the BASE extractor. D-035 says HOC must run "
-              "on the FINE-TUNED embeddings; results on base features are not a fair test.")
+
+    # A non-fine-tuned extractor means one of two different things, and the warning
+    # has to say which. Unflagged it is someone substituting these features for the
+    # D-037 protocol, which D-035 rules out. Flagged it is a D-040 arm, which is a
+    # separate sanctioned experiment asking a different question. Neither case is
+    # silent: the D-035 caveat is printed either way, because a D-040 arm result is
+    # still not a fair test of HOC-as-published and must never be reported as one.
+    if extractor not in ("finetuned", "unknown"):
+        print(f"NOTE: these embeddings are the '{extractor}' extractor, not the fine-tuned one.")
+        if args.d040_arm:
+            print("  Declared as a D-040 arm. That is sanctioned: D-040 pre-registers HOC on "
+                  "extractors never trained on this project's labels, to test whether the "
+                  "D-037 result survives the remedy Liu, Cheng and Zhang (2023) prescribe.")
+            print("  Still true, and still to be stated alongside the number: this is NOT a "
+                  "fair test of HOC-as-published (D-035), so it cannot be reported as one. "
+                  "Read D-040's pre-registered prediction and thresholds before the output.")
+        else:
+            print("  WARNING: not declared as a D-040 arm, so this reads as a substitute for "
+                  "the D-037 protocol. D-035 rules that out: HOC's own protocol takes the "
+                  "extractor from a model trained to near-100% accuracy on the noisy labels, "
+                  "and these features handicap it unfairly.")
+            print("  If this IS the D-040 arm, re-run with --d040-arm so the pre-registered "
+                  "decision rule is evaluated and recorded with the result.")
+    elif args.d040_arm:
+        print(f"WARNING: --d040-arm was passed but the extractor is '{extractor}'. D-040's arms "
+              "are the NON-fine-tuned extractors; the fine-tuned run is D-037. The D-040 rule "
+              "below is being evaluated against the wrong arm.")
+
     labels = metadata["condition"].to_numpy()
 
     config = HOCConfig(
@@ -523,7 +689,13 @@ def main(argv: list[str] | None = None) -> int:
           f"max_iter={config.max_iter} lr={config.lr}")
     results = run_hoc_multiseed(features, labels, args.seeds, config)
     agg = aggregate_results(results)
-    print(format_multiseed(results, agg))
+    print(format_multiseed(results, agg, extractor))
+
+    d040_verdict: dict[str, object] | None = None
+    if args.d040_arm:
+        d040_verdict = check_d040_rule(results, agg, extractor)
+        print("")
+        print(format_d040_verdict(d040_verdict))
 
     conditions = agg["conditions"]
     out_dir = Path(cache_dir)
@@ -557,8 +729,19 @@ def main(argv: list[str] | None = None) -> int:
     per_seed_T_out = out_dir / "hoc_per_seed_T.csv"
     per_seed_T_long(results).to_csv(per_seed_T_out, index=False)
 
-    print(f"\nWrote: {mean_out.name}, {std_out.name}, {per_seed_out.name}, "
-          f"{per_seed_T_out.name} -> {out_dir}")
+    written = [mean_out.name, std_out.name, per_seed_out.name, per_seed_T_out.name]
+    if d040_verdict is not None:
+        # Persist the branch as it was decided at run time. Recomputing it later from
+        # the per-seed CSV would give the same answer, but a stored verdict is what
+        # shows the rule was applied rather than reverse-engineered (D-040).
+        verdict_out = out_dir / "hoc_d040_verdict.csv"
+        flat = {k: v for k, v in d040_verdict.items() if not isinstance(v, dict)}
+        flat.update({f"threshold_{k}": v
+                     for k, v in dict(d040_verdict.get("thresholds", {})).items()})  # type: ignore[arg-type]
+        pd.DataFrame([flat]).to_csv(verdict_out, index=False)
+        written.append(verdict_out.name)
+
+    print(f"\nWrote: {', '.join(written)} -> {out_dir}")
     return 0
 
 

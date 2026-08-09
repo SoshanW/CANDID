@@ -16,6 +16,20 @@ That is the "representation before the classification head" the diagnostic needs
 An alternative (raw ``last_hidden_state[:, 0]``) was rejected because it is not the
 tensor this architecture's head actually reads.
 
+DECISION (feature = masked mean-pooled last_hidden_state, for the sentence
+encoder only): the ``mpnet`` extractor (D-040 Arm B,
+``sentence-transformers/all-mpnet-base-v2``) does NOT use the pooler_output path
+above. Its published pooling is Transformer -> mean pooling -> L2 normalise, and
+its ``pooler_output`` is an untrained BERT-style [CLS] pooler that the sentence
+objective never optimised, so reading it would return a tensor the model was not
+built to expose. The feature taken here is therefore
+``last_hidden_state`` averaged over the non-padding positions only
+(:func:`masked_mean_pool`), then L2-normalised, which reproduces the model card's
+two pooling modules. Normalisation is a no-op for every consumer in this repo
+(:mod:`src.noise.clusterability` and :mod:`src.noise.hoc_estimate` both L2-normalise
+before measuring anything), so it cannot introduce an arm-to-arm difference in the
+D-040 comparison; it is applied so the cache matches the published encoder's output.
+
 DECISION (run location): extraction needs the Milestone 0 checkpoint and the
 persisted ``splits/train.csv``, both of which live on Google Drive from the Colab
 training run, not on the local machine. This module is therefore meant to run on
@@ -41,6 +55,7 @@ import pandas as pd
 from ..modeling.config import ArtifactPaths, ModelConfig
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    import torch
     from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 #: Filenames written under a cache directory. The float matrix and its aligned
@@ -51,8 +66,8 @@ METADATA_FILENAME: str = "metadata.csv"
 
 #: Columns persisted next to the feature matrix. ``condition`` is the NOISY proxy
 #: label the clusterability diagnostic groups by; ``extractor`` records which model
-#: produced the features (D-035 control) so downstream analysis cannot silently mix
-#: fine-tuned and base embeddings; the rest are for traceability.
+#: produced the features (D-035 control, D-040 Arm B) so downstream analysis cannot
+#: silently mix feature sets from different encoders; the rest are for traceability.
 METADATA_COLUMNS: tuple[str, ...] = (
     "row_index",
     "author_id",
@@ -66,6 +81,21 @@ METADATA_COLUMNS: tuple[str, ...] = (
 #: base`` needs the Hugging Face login (notebook step 4b); the fine-tuned run does
 #: not, because it loads a local checkpoint.
 BASE_MODEL_ID: str = "mental/mental-bert-base-uncased"
+
+#: HF Hub id of the contrastively trained sentence encoder used by D-040 Arm B. It
+#: has never seen this project's labels and is not a mental-health model at all,
+#: which is the point: it is the text analogue of Liu, Cheng and Zhang's (2023)
+#: SimCLR row. Pinned by name here rather than passed as a string at the call site
+#: so the arm cannot silently change encoder between runs. NOT a gated repo, so this
+#: arm needs no Hugging Face login.
+SENTENCE_MODEL_ID: str = "sentence-transformers/all-mpnet-base-v2"
+
+#: Extractor values the CLI accepts, and the values stamped into the ``extractor``
+#: metadata column. Each maps to a distinct cache directory via
+#: :func:`default_embeddings_dir`, so no two can clobber each other.
+#: ``finetuned`` = D-034 (Milestone 0 checkpoint), ``base`` = D-035/D-036 control,
+#: ``mpnet`` = D-040 Arm B.
+EXTRACTORS: tuple[str, ...] = ("finetuned", "base", "mpnet")
 
 
 @dataclass(frozen=True)
@@ -108,9 +138,12 @@ def default_embeddings_dir(
 
     DECISION (distinct paths per extractor): the fine-tuned run keeps the original
     ``embeddings/<split>`` path so its existing D-034 cache is never overwritten;
-    any other extractor (e.g. base MentalBERT for the D-035 control) gets a
-    distinct sibling ``embeddings/<split>__<extractor>`` so the two feature sets
-    cannot clobber each other.
+    every other extractor (base MentalBERT for the D-035 control, the sentence
+    encoder for D-040 Arm B) gets a distinct sibling
+    ``embeddings/<split>__<extractor>``, so no two feature sets can clobber each
+    other. The suffix is the extractor name itself, so adding an arm cannot collide
+    with an existing cache unless it reuses an existing extractor name, which
+    :data:`EXTRACTORS` prevents.
     """
     base = artifacts.root / "embeddings"
     if extractor == "finetuned":
@@ -196,13 +229,135 @@ def extract_pooled_embeddings(
     return features.astype(embed_config.output_dtype, copy=False)
 
 
+def masked_mean_pool(
+    last_hidden_state: "torch.Tensor", attention_mask: "torch.Tensor"
+) -> "torch.Tensor":
+    """Average ``last_hidden_state`` over non-padding positions only.
+
+    ``(batch, seq, hidden)`` and ``(batch, seq)`` in, ``(batch, hidden)`` out. The
+    attention mask is broadcast over the hidden dimension so padded positions
+    contribute neither to the numerator nor to the token count; averaging without
+    the mask would drag every vector towards the padding embedding, and would do so
+    unevenly because short posts carry more padding than long ones.
+
+    This reproduces ``sentence_transformers.models.Pooling`` in
+    ``mean``-with-attention-mask mode, which is the pooling
+    ``sentence-transformers/all-mpnet-base-v2`` publishes. An all-zero mask row
+    yields a zero vector rather than a division by zero (the denominator is clamped),
+    matching that implementation.
+
+    Written with tensor methods only (no ``torch.*`` namespace calls) so this module
+    keeps its torch-free import surface; the caller supplies the tensors.
+    """
+    if attention_mask.shape != last_hidden_state.shape[:2]:
+        raise ValueError(
+            "attention_mask must be (batch, seq) matching last_hidden_state's first "
+            f"two dims; got {tuple(attention_mask.shape)} vs "
+            f"{tuple(last_hidden_state.shape)}."
+        )
+    mask = attention_mask.unsqueeze(-1).to(last_hidden_state.dtype)
+    summed = (last_hidden_state * mask).sum(dim=1)
+    counts = mask.sum(dim=1).clamp(min=1e-9)
+    return summed / counts
+
+
+def extract_mean_pooled_embeddings(
+    df: pd.DataFrame,
+    model_id: str = SENTENCE_MODEL_ID,
+    embed_config: EmbeddingConfig | None = None,
+) -> np.ndarray:
+    """Return the ``(n_rows, hidden_size)`` sentence-encoder matrix for ``df`` (D-040 Arm B).
+
+    Rows are emitted in the exact order of ``df``, as in
+    :func:`extract_pooled_embeddings`, so the result aligns positionally with
+    metadata taken from the same frame. The encoder is a plain ``AutoModel`` (no
+    classification head exists or is wanted here) and the feature is masked mean
+    pooling over ``last_hidden_state``, L2-normalised: see the module DECISION note
+    on why ``pooler_output`` is deliberately NOT read for this extractor.
+
+    Args:
+        df: Canonical frame with a ``text`` column (labels are ignored here).
+        model_id: HF Hub id of the sentence encoder; defaults to
+            :data:`SENTENCE_MODEL_ID`.
+        embed_config: Extraction knobs; defaults to :class:`EmbeddingConfig`.
+
+    Raises:
+        RuntimeError: if the loaded model produces no ``last_hidden_state``, or if
+            the tokenizer emits no ``attention_mask`` (without the mask the pooling
+            would silently average over padding).
+    """
+    import torch
+    from torch.utils.data import DataLoader
+    from transformers import AutoModel
+
+    from ..modeling.dataset import TextClassificationDataset
+    from ..modeling.hf_model import load_tokenizer
+
+    embed_config = embed_config or EmbeddingConfig()
+
+    device = embed_config.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer: "PreTrainedTokenizerBase" = load_tokenizer(model_id)
+    encoder: "PreTrainedModel" = AutoModel.from_pretrained(model_id)
+    encoder = encoder.to(device)
+    encoder.eval()
+
+    # DECISION (max_length stays 256 here too): all-mpnet-base-v2's own
+    # max_seq_length is 384, so capping at 256 truncates more than the encoder's
+    # default would. That is deliberate. Methodology section 3.4.3 commits the
+    # classifier and every embedding extractor to ONE truncation cap, so that a
+    # difference between D-037 and D-040 cannot be attributed to the arms having
+    # read different amounts of each post. Reusing TextClassificationDataset (rather
+    # than the sentence-transformers encode() path, which owns its own tokenisation)
+    # is what enforces the cap: all three extractors tokenise through this one class.
+    dataset = TextClassificationDataset(df, tokenizer, embed_config.max_length)
+
+    # Mirrors extract_pooled_embeddings' collate: model inputs only, never labels.
+    def _collate(batch: list[dict]) -> dict:
+        keys = [k for k in batch[0] if k != "labels"]
+        return {k: torch.stack([ex[k] for ex in batch]).to(device) for k in keys}
+
+    loader = DataLoader(
+        dataset,
+        batch_size=embed_config.batch_size,
+        shuffle=False,
+        collate_fn=_collate,
+    )
+
+    chunks: list[np.ndarray] = []
+    with torch.no_grad():
+        for inputs in loader:
+            if "attention_mask" not in inputs:
+                raise RuntimeError(
+                    "Tokenizer produced no attention_mask; masked mean pooling cannot "
+                    "distinguish padding from content without it. Check the tokenizer "
+                    f"for {model_id!r} before running the diagnostic."
+                )
+            outputs = encoder(**inputs)
+            hidden = getattr(outputs, "last_hidden_state", None)
+            if hidden is None:
+                raise RuntimeError(
+                    "Loaded encoder produced no last_hidden_state; the mean-pooled "
+                    "feature needs the full token sequence. Got output type "
+                    f"{type(outputs).__name__}. Revisit the feature definition for "
+                    "this architecture before running the diagnostic."
+                )
+            pooled = masked_mean_pool(hidden, inputs["attention_mask"])
+            # L2 normalise: the third module of the published all-mpnet-base-v2
+            # pipeline. A no-op for this repo's consumers, which normalise anyway.
+            pooled = torch.nn.functional.normalize(pooled, p=2.0, dim=1)
+            chunks.append(pooled.detach().cpu().to(torch.float32).numpy())
+
+    features = np.concatenate(chunks, axis=0)
+    return features.astype(embed_config.output_dtype, copy=False)
+
+
 def build_metadata_frame(df: pd.DataFrame, extractor: str = "finetuned") -> pd.DataFrame:
     """Assemble the per-row metadata persisted next to the feature matrix.
 
     ``row_index`` records the original position so alignment survives a reload even
     if columns are reordered. ``extractor`` stamps which model produced the features
-    (D-035 control) so a later comparison cannot silently mix extractors. Missing
-    optional columns are filled with ``"unknown"``.
+    (D-035 control, D-040 Arm B) so a later comparison cannot silently mix
+    extractors. Missing optional columns are filled with ``"unknown"``.
     """
     n = len(df)
     out = pd.DataFrame({"row_index": np.arange(n, dtype="int64")})
@@ -257,12 +412,14 @@ def load_embeddings(cache_dir: str | Path) -> tuple[np.ndarray, pd.DataFrame]:
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Extract + cache MentalBERT pooled embeddings.")
     p.add_argument("--artifacts-root", type=Path, default=None, help="Models dir (default <repo>/Models).")
-    p.add_argument("--extractor", type=str, default="finetuned", choices=("finetuned", "base"),
-                   help="Feature extractor: fine-tuned Milestone 0 checkpoint (default) or base "
-                        "MentalBERT (D-035 control, needs HF login on Colab).")
+    p.add_argument("--extractor", type=str, default="finetuned", choices=EXTRACTORS,
+                   help="Feature extractor: fine-tuned Milestone 0 checkpoint (default), base "
+                        "MentalBERT (D-035 control, needs HF login on Colab), or the "
+                        "all-mpnet-base-v2 sentence encoder (D-040 Arm B, no HF login needed).")
     p.add_argument("--checkpoint-dir", type=Path, default=None,
                    help="Override the model source (default: <artifacts>/checkpoints/latest for "
-                        "finetuned, the base MentalBERT hub id for base).")
+                        "finetuned, the base MentalBERT hub id for base, the sentence-encoder hub "
+                        "id for mpnet).")
     p.add_argument("--split", type=str, default="train", help="Which persisted split CSV to embed.")
     p.add_argument("--max-length", type=int, default=EmbeddingConfig().max_length)
     p.add_argument("--batch-size", type=int, default=EmbeddingConfig().batch_size)
@@ -285,6 +442,8 @@ def main(argv: list[str] | None = None) -> int:
         source: str | Path = args.checkpoint_dir
     elif args.extractor == "base":
         source = BASE_MODEL_ID
+    elif args.extractor == "mpnet":
+        source = SENTENCE_MODEL_ID
     else:
         source = artifacts.checkpoints_dir / "latest"
 
@@ -301,7 +460,13 @@ def main(argv: list[str] | None = None) -> int:
         output_dtype=args.output_dtype,
         device=args.device,
     )
-    features = extract_pooled_embeddings(df, source, ModelConfig(), embed_config)
+    # The sentence encoder has no classification head and a different pooling rule,
+    # so it takes its own extraction path (see the module DECISION notes). The other
+    # two extractors are BERT sequence-classification models and share theirs.
+    if args.extractor == "mpnet":
+        features = extract_mean_pooled_embeddings(df, str(source), embed_config)
+    else:
+        features = extract_pooled_embeddings(df, source, ModelConfig(), embed_config)
     metadata = build_metadata_frame(df, extractor=args.extractor)
 
     cache_dir = args.output_dir or default_embeddings_dir(artifacts, args.split, args.extractor)

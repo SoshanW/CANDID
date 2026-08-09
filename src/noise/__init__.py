@@ -30,11 +30,15 @@ from .clusterability import (
 )
 from .embeddings import (
     BASE_MODEL_ID,
+    EXTRACTORS,
+    SENTENCE_MODEL_ID,
     EmbeddingConfig,
     build_metadata_frame,
     default_embeddings_dir,
+    extract_mean_pooled_embeddings,
     extract_pooled_embeddings,
     load_embeddings,
+    masked_mean_pool,
     save_embeddings,
 )
 from .cleanlab_estimate import (
@@ -47,12 +51,17 @@ from .cleanlab_estimate import (
     reduce_probs_to_classes,
 )
 from .hoc_estimate import (
+    D040_MIN_ABS_DET,
+    D040_NARROW_DIAGONAL,
+    D040_STRENGTHEN_DIAGONAL,
     HOCConfig,
     HOCResult,
     aggregate_results,
+    check_d040_rule,
     check_pre_registered_prediction,
     compare_to_reference,
     estimate_hoc,
+    format_d040_verdict,
     make_clusterable_noisy_data,
     per_seed_frame,
     per_seed_T_long,
@@ -70,7 +79,11 @@ from .oos_probabilities import (
 __all__ = [
     "EmbeddingConfig",
     "BASE_MODEL_ID",
+    "SENTENCE_MODEL_ID",
+    "EXTRACTORS",
     "extract_pooled_embeddings",
+    "extract_mean_pooled_embeddings",
+    "masked_mean_pool",
     "build_metadata_frame",
     "save_embeddings",
     "load_embeddings",
@@ -89,6 +102,11 @@ __all__ = [
     "run_hoc_multiseed",
     "aggregate_results",
     "check_pre_registered_prediction",
+    "check_d040_rule",
+    "format_d040_verdict",
+    "D040_STRENGTHEN_DIAGONAL",
+    "D040_NARROW_DIAGONAL",
+    "D040_MIN_ABS_DET",
     "make_clusterable_noisy_data",
     "prior_divergence",
     "per_seed_frame",

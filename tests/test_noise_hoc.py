@@ -15,9 +15,13 @@ import pytest
 
 from src.noise.hoc_estimate import (
     HOCConfig,
+    HOCResult,
     _count_consensus,
+    aggregate_results,
+    check_d040_rule,
     check_pre_registered_prediction,
     compare_to_reference,
+    format_d040_verdict,
     make_clusterable_noisy_data,
     prior_divergence,
 )
@@ -78,6 +82,105 @@ def test_prior_divergence_zero_and_positive() -> None:
     assert prior_divergence(uni, conds)["l1"] == pytest.approx(float(np.abs(uni - obs).sum()))
 
 
+# --- D-040 pre-registered decision rule -----------------------------------------
+
+_D040_CONDS = ["bipolar", "depression", "eating_disorder", "schizophrenia"]
+
+
+def _fake_results(bipolar_diag: float, det: float, dominant: bool, n_seeds: int = 3) -> list[HOCResult]:
+    """Build HOCResults with a chosen bipolar diagonal and assumption state.
+
+    The rule reads the bipolar diagonal off the aggregated mean T and the assumption
+    flags off every individual seed, so both have to be set consistently here.
+    """
+    t = np.full((4, 4), (1.0 - bipolar_diag) / 3.0)
+    np.fill_diagonal(t, bipolar_diag)
+    row_dd = {c: dominant for c in _D040_CONDS}
+    return [
+        HOCResult(
+            conditions=list(_D040_CONDS),
+            T=t,
+            p=np.full(4, 0.25),
+            noisy_marginal=np.full(4, 0.25),
+            seed=s,
+            diagonal=np.diag(t).copy(),
+            row_diagonally_dominant=row_dd,
+            is_nonsingular=abs(det) > 1e-8,
+            det=det,
+            final_loss=0.0,
+        )
+        for s in range(n_seeds)
+    ]
+
+
+@pytest.mark.parametrize(
+    "bipolar_diag, det, dominant, expected",
+    [
+        # Failure survives the prescribed fix, assumptions intact.
+        (0.95, 0.92, True, "STRENGTHENED_ARM"),
+        # HOC recovered real noise, assumptions intact -> C1 narrows.
+        (0.30, 0.80, True, "NARROWED"),
+        # Same low diagonal, but the matrix collapsed: NOT a rescue.
+        (0.30, 0.01, True, "DEGENERATE"),
+        (0.30, 0.80, False, "DEGENERATE"),
+        # The pre-registered no-claim band.
+        (0.75, 0.92, True, "INDETERMINATE"),
+        # Nothing may fall through the table.
+        (0.95, 0.01, True, "ASSUMPTIONS_FAILED"),
+    ],
+)
+def test_d040_rule_branches(bipolar_diag, det, dominant, expected) -> None:
+    results = _fake_results(bipolar_diag, det, dominant)
+    verdict = check_d040_rule(results, aggregate_results(results), extractor="base")
+    assert verdict["branch"] == expected
+    assert verdict["extractor"] == "base"
+
+
+@pytest.mark.parametrize(
+    "bipolar_diag, expected",
+    [
+        (0.85, "STRENGTHENED_ARM"),  # strengthen threshold is inclusive
+        (0.70, "INDETERMINATE"),     # narrow threshold is exclusive: 0.70 is in the band
+    ],
+)
+def test_d040_rule_threshold_boundaries_are_as_pre_registered(bipolar_diag, expected) -> None:
+    # One seed, so the aggregated mean is bit-exact and the assertion is about the
+    # comparison operators rather than about floating-point averaging.
+    results = _fake_results(bipolar_diag, det=0.92, dominant=True, n_seeds=1)
+    verdict = check_d040_rule(results, aggregate_results(results), extractor="base")
+    assert verdict["bipolar_diagonal"] == bipolar_diag
+    assert verdict["branch"] == expected
+
+
+def test_d040_rule_requires_assumptions_on_every_seed() -> None:
+    # A single collapsed seed must not be averaged away by four healthy ones: D-040
+    # says the assumptions have to hold on every seed, not on the mean.
+    results = _fake_results(0.30, det=0.80, dominant=True, n_seeds=5)
+    results[2] = HOCResult(**{**results[2].__dict__, "det": 0.001})
+    verdict = check_d040_rule(results, aggregate_results(results), extractor="mpnet")
+    assert verdict["branch"] == "DEGENERATE"
+    assert verdict["nonsingular_all_seeds"] is False
+
+
+def test_d040_rule_without_bipolar_is_not_applicable() -> None:
+    results = _fake_results(0.95, 0.92, True)
+    conds = ["a", "b", "c", "d"]
+    patched = [HOCResult(**{**r.__dict__, "conditions": conds}) for r in results]
+    verdict = check_d040_rule(patched, aggregate_results(patched), extractor="base")
+    assert verdict["branch"] == "NOT_APPLICABLE"
+    assert "not applicable" in format_d040_verdict(verdict)
+
+
+def test_d040_verdict_prints_thresholds_before_the_number() -> None:
+    # The rendered verdict must show the pre-registered thresholds, so a reader can
+    # see they were fixed in advance rather than fitted to the result.
+    results = _fake_results(0.30, 0.80, True)
+    text = format_d040_verdict(check_d040_rule(results, aggregate_results(results), "base"))
+    assert "0.85" in text and "0.7" in text and "0.5" in text
+    assert text.index("thresholds") < text.index("BRANCH")
+    assert "NARROWED" in text
+
+
 def test_compare_to_reference_pass_and_fail(tmp_path) -> None:
     conds = ["bipolar", "depression"]
     mean_t = np.array([[0.9, 0.1], [0.05, 0.95]])
@@ -96,7 +199,6 @@ def test_compare_to_reference_pass_and_fail(tmp_path) -> None:
 torch = pytest.importorskip("torch")
 
 from src.noise.hoc_estimate import (  # noqa: E402
-    aggregate_results,
     estimate_hoc,
     per_seed_T_long,
     per_seed_frame,

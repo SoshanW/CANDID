@@ -21,3 +21,16 @@ numpy>=1.24
 # probabilities). Pure-python deps (numpy/pandas/scikit-learn/termcolor/tqdm), so
 # it is safe to install into a Colab runtime without disturbing the CUDA torch.
 cleanlab>=2.6,<3
+
+# sentence-transformers supplies the D-040 Arm B feature extractor
+# (sentence-transformers/all-mpnet-base-v2), a contrastively trained encoder that has
+# never seen this project's labels. Capped below 6 because 5.x declares
+# `transformers<6.0.0,>=4.41.0`, which is satisfied by the pinned transformers==5.14.1,
+# so installing it will NOT downgrade that pin. Its only new hard deps are scipy and
+# typing_extensions (pure-python/prebuilt wheels); `torch>=1.11.0` is already satisfied
+# by the preinstalled CUDA torch on Colab, so it is safe to install there without
+# disturbing it. NOTE: extraction itself goes through transformers' AutoModel plus this
+# repo's own masked mean pooling, so that all three extractors share one tokenisation
+# path and one 256-token cap (methodology 3.4.3); this package is the authority for
+# the encoder's published pooling definition and is what a parity check would load.
+sentence-transformers>=5.0,<6
