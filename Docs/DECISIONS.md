@@ -99,6 +99,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-039 | Cleanlab result: agrees with HOC on structure, contradicts on magnitude | ACTIVE | C1 |
 | D-040 | HOC on representations not trained on the project's labels (pre-registration) | ACTIVE | C1 |
 | D-041 | D-040 result: HOC's structure is stable, its magnitude is representation-dependent | ACTIVE | C1 |
+| D-042 | Sesia's Algorithm 2 interface pinned; degeneracy is closed-form, and it strengthens C1 | ACTIVE | C1/C2 |
 ---
 
 # Part 1 · Scope and framing
@@ -1401,6 +1402,223 @@ D-035. Feeds C2 (D-027, D-028).
 
 ---
 
+## D-042 · Sesia's Algorithm 2 interface pinned; degeneracy is closed-form
+**Date:** 2026-08-14 · **Status:** ACTIVE · **Category:** C1/C2
+
+**This entry is a derivation, not a pre-registration.** No run produced it. It records
+what reading Sesia, Wang and Tong (2025) in full establishes about what Algorithm 2
+consumes, plus arithmetic evaluated on matrices already on record in D-037 and D-039.
+The distinction matters for the scoreboard: this is the seventh claim made after
+reading a full paper, and unlike the six before it, it has not yet been checked
+against a run. The pre-registration for that run is deferred to D-043.
+
+Working document: `Docs/c2-interface.md`. Code: `src/conformal/`, reproduced by
+`python -m src.conformal`, with `tests/test_conformal_v_region.py` pinning the numbers
+below.
+
+---
+
+### 1. What Algorithm 2 consumes
+
+The noise input is a `1 - α_V` simultaneous confidence region on the **off-diagonal
+entries of `V = M⁻¹`**, supplied as an interval box `[V̂_low, V̂_upp]`, together with
+deterministic a priori bounds `V̄_upp` satisfying `max{|V̂_upp_kl|, |V_kl|} ≤ |V̄_upp_kl|`
+almost surely for `l ≠ k`. It is not a set of matrices and not an ε-contamination ball.
+
+Only the off-diagonals are required. M's rows sum to one, so `M·1 = 1`, hence `V·1 = 1`
+and `V_kk = 1 - Σ_{l≠k} V_kl`.
+
+### 2. C1's output is in the opposite direction, and the conversion is not free
+
+Sesia's Proposition 1 defines `M_kl = P[Y = l | Ỹ = k]`. C1 estimates
+`T_lk = P[Ỹ = k | Y = l]`. The conversion is:
+
+```
+ρ = (Tᵀ)⁻¹ ρ̃        M = diag(ρ̃)⁻¹ Tᵀ diag(ρ)        V = M⁻¹
+```
+
+`ρ̃` is observable. The clean prior `ρ` is recovered from `ρ̃ = Tᵀρ` rather than
+assumed, so it requires no external input but inherits whatever error `T` carries and
+can in principle leave the simplex. It does not for either matrix on record: HOC
+fine-tuned gives 0.0369 / 0.8132 / 0.0961 / 0.0538 and cleanlab gives 0.0336 / 0.8199 /
+0.0952 / 0.0513, against observed noisy proportions 0.038 / 0.812 / 0.096 / 0.054.
+
+This is the concrete content of D-028. It also confirms the D-031 option (a) corollary
+is real rather than notional: `α_V` enters the correction term (their equation 21) as
+`2 α_V Σ_{l≠k}|V̄_upp_kl|`, so a deterministically containing region removes that term
+outright.
+
+### 3. The always-abstain failure mode is a closed-form inequality
+
+Algorithm 2 constructs `Î_ci_k := {i ∈ [n_k] : i/n_k ≥ 1 - α - Δ̂_ci_k(S_(i)) +
+δ_ci(n_k, n*)}` and sets `τ̂_k = 1` when that set is empty. By their Definition 1,
+`τ_k = 1` places class k in every prediction set, which is the degenerate outcome
+D-032 anticipated. Evaluating the membership test at `i = n_k`, where the class-k score
+CDF equals one by construction, gives:
+
+> **τ̂_k = 1 whenever δ_ci(n_k, n\*) > α + Δ̂_ci_k(S_(n_k))**, with
+> `0 ≤ Δ̂_ci_k(S_(n_k)) ≤ Σ_{l≠k}|V̂_upp_kl| =: D̂_max`.
+
+Testing `δ_ci > α` alone therefore over-flags degeneracy by at most `D̂_max`, and a
+verdict is robust only when the margin exceeds it. Both quantities are reported below.
+
+With `α_V = 0`, and noting that `|V̂_upp_kl| + δ̂^(V)_kl = |V̂_low_kl|` for negative
+off-diagonals (which every matrix on record has):
+
+```
+δ_ci(n_k, n*) = c(n_k) + (2/√n*) · Σ_{l≠k}|V̂_low_kl| · min{K√(π/2), 1/√n* + √((log 2K + log n*)/2)}
+```
+
+Two structural consequences, each load-bearing:
+
+1. **The binding quantity is the greatest total off-diagonal mass of V the region
+   admits.** Region width and noise magnitude enter through the same channel, so they
+   cannot be traded against one another.
+2. **`n* = min_k n_k`.** The rarest condition's calibration count sets the correction
+   term for every condition. Bipolar governs depression's threshold.
+
+### 4. Evaluated on this project's numbers
+
+**What is being evaluated, stated before the numbers.** Both regions below are built by
+stacking C1's estimated matrices into a containment box, so they express **C1's
+disagreement in V coordinates**. Neither is C2's input. C2's input is the elicited
+region of D-028, which does not exist yet and is not evaluated here. What follows
+therefore measures the *consequence* of C1's finding for a downstream consumer, which
+strengthens C1; it does not test C2. Section 6 spells out why that distinction matters.
+
+`α = 0.10`, `α_V = 0`, `K = 4`, calibration counts from the C0 test split (bipolar 481,
+depression 11,351, eating disorder 1,421, schizophrenia 786), so `n* = 481`.
+
+| region | contents | bipolar δ_ci | margin | D̂_max | verdict |
+|---|---|---|---|---|---|
+| A | D-037 and D-039 | 0.0919 | -0.0081 | 0.0804 | survives |
+| B | all four C1 estimates | 0.2848 | +0.1848 | 0.0804 | degenerate, robust |
+
+Per condition at region B: depression 0.0152 and eating disorder 0.0506 survive;
+**schizophrenia reaches 0.1524, a margin of +0.0524 against a `D̂_max` of 0.0262, so it
+degenerates robustly as well.** Two of four conditions are inadmissible at the C0
+operating point.
+
+Bipolar's region A margin of 0.008 does not survive `α = 0.05`.
+
+**The calibration count cannot rescue region B.** `n*` enters at a `√n` rate, so
+enlarging the calibration set moves δ_ci slowly: bipolar goes 0.2751, 0.2004, 0.1665,
+0.1460, 0.1318 across calibration shares of 10, 20, 30, 40 and 50 percent of the
+corpus. **Region B is inadmissible at α = 0.10 at every share.** It becomes admissible
+only at α = 0.20 with a 30% share or more, which costs 80% label-conditional coverage
+for a screening instrument *and* moves a fifth of the corpus out of training, degrading
+the classifier and therefore the scores. That configuration is recorded as a measured
+point on the frontier, not as a recommendation. **Region A is admissible at α = 0.10 at
+every share, including the 10% already available.**
+
+Feasibility frontier, the largest admissible `Σ_{l≠k}(|V̂_upp_kl| + δ̂^(V)_kl)` at
+`α = 0.10`: bipolar 0.378, schizophrenia 0.411, eating disorder 0.441, depression
+0.497. Region B's bipolar mass is **1.354**, which is 3.6 times the budget.
+
+### 5. All four inputs are now measured, and a one-arm inference was wrong
+
+D-041 transcribes only the **diagonals** of the base and mpnet arms. Both full matrices
+were retrieved on 2026-08-14 from `Models/embeddings/train__mpnet/hoc_mean_T.csv` and
+`Models/embeddings/train__base/hoc_mean_T.csv`. Neither directory holds a
+`hoc_mean_T_rerun.csv`, so neither carries the ambiguity that `train/` does. Both
+cross-check against D-041 (mpnet diagonal 0.7071, sd 0.0104, mean |det| 0.5113,
+INDETERMINATE; base 0.5409, sd 0.0084, mean |det| 0.2595, DEGENERATE).
+
+**A note on the base arm's invertibility, which Sesia's Theorem 4 requires.** Its
+`hoc_d040_verdict.csv` records `nonsingular_all_seeds=False`. That field reports failure
+of D-040's pre-registered |det| ≥ 0.5 quality bar, not singularity. Every seed in
+`hoc_per_seed.csv` has `nonsingular=True` with |det| between 0.247 and 0.267, so the
+matrix inverts and the conversion is valid. The field name invites the opposite reading
+and is worth flagging wherever it is quoted.
+
+**An inference drawn from one arm was wrong, and is corrected here.** While only mpnet
+was measured, this entry recorded that the diagonal reconstruction understates bipolar's
+off-diagonal mass in V (ratio 0.92) and concluded the degeneracy verdict was therefore
+conservative. The base arm contradicts it: there the reconstruction **overstates**
+bipolar's mass (ratio 1.19) and understates schizophrenia's (0.79). The error has no
+stable sign across arms or across conditions, and a single arm never licensed the
+generalisation. This is the same shape of mistake D-034 logs, caught earlier and at
+lower cost, and it is the reason the reconstruction is now used only as a check and
+never as an input.
+
+**Both changes moved the result.** Bipolar's δ_ci fell from 0.3328 to 0.2848 and
+remained robustly degenerate. Schizophrenia rose from 0.1251 to 0.1524 and moved from
+**borderline to robust**, so the count of inadmissible conditions at the C0 operating
+point is two, not one.
+
+### 6. This strengthens C1. It does not test C2.
+
+**The degeneracy result belongs to C1.** Region B is D-041's spread in different
+coordinates, so its failure restates what D-041 already established. What passing it
+through δ_ci adds is a *quantity*:
+
+> D-041 shows the estimators disagree. It cannot say **how much** disagreement is too
+> much, because that question has no meaning without a downstream consumer. Sesia
+> supplies the consumer. Bipolar's admissible off-diagonal mass in V is 0.378 at
+> α = 0.10, and region B sits at 1.354.
+
+This closes an argumentative gap in C1. The question "the estimators disagree, so what,
+perhaps it is close enough in practice" previously had no numeric answer, and now has
+one: not close enough for the method that would consume it, by a factor of 3.6. C1
+should carry this, and D-041 should be read alongside it.
+
+**C2's claim is untouched.** C2 is not "use C1's spread as the region". It is that
+clinical elicitation supplies a region the data cannot. No elicited region exists yet,
+so nothing here evaluates it. What the arithmetic contributes to C2 is a **design
+budget** that open item 6 previously lacked: the elicitation now has a numeric success
+criterion (0.378 for bipolar at α = 0.10) rather than an open-ended reading task.
+
+**Both outcomes remain reportable, as D-032 requires.** If the elicited region fits the
+budget, C2 is a method and the contrast against 1.354 is the headline. If it does not,
+the per-condition frontier is the characterisation result, in the sharper form of
+"which conditions are admissible at which operating points" rather than "the coupling
+does not pay off".
+
+**Consequential changes.**
+
+- The C2 proof-of-concept is re-planned (`progress-and-roadmap.md` §5). Steps 1 and 2
+  are closed; the closed-form frontier replaces a simulated sweep as the main curve.
+- α and the calibration fraction are reportable design variables, because both enter
+  δ_ci directly. Neither is a route to feasibility for a region of region B's width.
+- Open item 6 acquires a target, which changes how the elicitation should be scoped:
+  wide-but-defensible ranges are only useful while they stay inside the budget, and
+  D-031's decision not to prune interacts directly with that.
+
+### 7. What is still open, and belongs in D-043
+
+The closed form is sufficient for degeneracy and silent about everything short of it.
+A run is still required for: mean set size for bipolar inside region A; whether
+Assumptions 2, 3 and 5 hold empirically on this data; the D-032 head-to-head of arm (c)
+against arm (b) at region A width; and the α at which each condition flips, measured
+against the closed-form prediction above. That last item turns this derivation into a
+falsifiable prediction, and D-043 should record it as one before the run.
+
+### 8. Limitations named here rather than left for an examiner (D-019)
+
+- **Assumption 1 (`Ỹ ⊥ X | Y`) is untested on this data and is not obviously true.**
+  Which subreddit a person posts to plausibly depends on the text itself, not only on
+  the underlying condition. Every guarantee in Theorems 2 to 5 rests on it.
+- **The supplementary material was not available when this entry was written.**
+  Sections S3, S4 and S5 carry the worked constructions of `V̂_low`, `V̂_upp` and
+  `V̄_upp`, which are the template the elicited region should follow. Located
+  subsequently: arXiv:2309.05092, 127 pages including all appendices.
+- **Sesia's own route to V requires clean labels.** Their Section 3.3 and Proposition 4
+  estimate `V = Q Q̃⁻¹` from a clean set `D₀` alongside a contaminated set `D₁`, with the
+  region obtained by parametric multinomial bootstrap (Sison and Glaz, 1995). This
+  project has no clean labels, which is what makes the elicited region the available
+  route rather than a preferred one, and it means the head-to-head against their own
+  estimation procedure cannot be run here.
+- **The prediction function is not yet fixed.** Their equation (3) is the plain
+  threshold on `π̂`; their Section 4 uses the generalised inverse quantile scores of
+  Romano, Sesia et al. (2020). Set sizes differ between them and the choice must be
+  recorded before the arms are compared.
+
+**Links.** Implements D-027 and D-028. Confirms the D-031 option (a) corollary by
+reading the equations. Consumes D-037, D-039 and D-041. Re-plans D-032's sweep.
+Applies D-033. Pre-registration for the simulation deferred to D-043.
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
@@ -1524,8 +1742,9 @@ The elicited set needs each range tied to a specific study. The *directions* are
 
 | Claims made from abstracts or snippets | 4 |
 | Of those, materially wrong | **4** |
-| Claims made after reading the full paper | 6 |
+| Claims made after reading the full paper | 7 |
 | Of those, materially wrong | **0** |
+| Of those, not yet tested against a run | 1 (D-042) |
 | Pre-registered predictions recorded before a run | 4 |
 | Of those, held in full | 2 (D-035's rule, D-036/D-037) |
 | Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
@@ -1536,6 +1755,12 @@ The sixth full-paper claim is D-040's, from Liu, Cheng and Zhang (2023): that th
 a fourth identifiability route and that HOC's accuracy depends materially on the
 feature extractor. D-041 bore it out, and more strongly than expected: the bipolar
 diagonal moves from 0.5409 to 0.9534 across three encoders on identical data.
+
+The seventh is D-042's, from Sesia, Wang and Tong (2025): that Algorithm 2 consumes an
+interval box on the off-diagonals of `V = M⁻¹`, and that its degenerate case is a
+closed-form inequality. It is counted separately as untested because no run has checked
+it. D-043 should record the α at which each condition is predicted to flip, so that the
+simulation can either confirm it or move it into the wrong column.
 
 **The second block is the more useful one, and it is deliberately separate.** A project
 that only recorded predictions it got right would be recording nothing. Two of four
