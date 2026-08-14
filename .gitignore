@@ -25,6 +25,12 @@ env/
 .coverage
 htmlcov/
 
+# Claude Code working files — local assistant instructions and skills, not
+# thesis deliverables. `CLAUDE.md` with no slash matches at every directory level.
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+
 # IDE / OS
 .vscode/
 .idea/

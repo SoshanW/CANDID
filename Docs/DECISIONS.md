@@ -98,6 +98,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-038 | Cleanlab cross-validation fold integrity verified | ACTIVE | C1 |
 | D-039 | Cleanlab result: agrees with HOC on structure, contradicts on magnitude | ACTIVE | C1 |
 | D-040 | HOC on representations not trained on the project's labels (pre-registration) | ACTIVE | C1 |
+| D-041 | D-040 result: HOC's structure is stable, its magnitude is representation-dependent | ACTIVE | C1 |
 ---
 
 # Part 1 · Scope and framing
@@ -542,6 +543,32 @@ Zhu, Song and Liu's Theorem 2 gives HOC's finite-sample rate, but only when the 
 **UNVERIFIED.** This arithmetic was produced during this session from their formula. **Plug the actual counts in and check it independently.** It is currently the strongest single result in the project, which means it is also the one that will hurt most if it is wrong.
 
 **A further refinement.** The regime boundary is **not just sample size**. Zhu, Wang and Liu (2022) show AG's News has 30,000 examples per class, perfectly balanced, and HOC still errs by 0.133 because BERT text features are not clusterable enough. So the boundary is set by **sample size AND feature quality together**. For the rare conditions here, both are against the project at once. This is a sharper version of the original thesis than the one it started with.
+
+**Amendment (2026-08-14): provenance of the four counts, and why two totals exist.**
+
+The counts in the table above come from `Docs/project-proposal.md`, in the "Dataset correction (June 2026)" framing note, repeated in its dataset table (§5) and its timeline (§8):
+
+> "all four core conditions have been downloaded and directly verified (June 2026): **depression (117,331 posts), eating disorder (14,577), schizophrenia (8,712), bipolar (5,780)**"
+
+They sum to 146,400. That proposal is being relocated out of the repository, so the figures and their source are recorded here to keep the paper trail with the arithmetic that uses them.
+
+`python -m src.data` reports 140,086 rows, which reads as a contradiction of the proposal. It is not one. Both were re-measured on 2026-08-14 and both are correct: they count different things.
+
+| Condition | Raw rows on disk | After dedup | Removed | Share (raw) | Share (dedup) |
+|---|---|---|---|---|---|
+| Depression | 117,331 | 113,576 | 3,755 (3.2%) | 0.8014 | 0.8118 |
+| Eating disorder | 14,577 | 13,447 | 1,130 (7.8%) | 0.0996 | 0.0961 |
+| Schizophrenia | 8,712 | 7,680 | 1,032 (11.9%) | 0.0595 | 0.0549 |
+| Bipolar | 5,780 | 5,195 | 585 (10.1%) | 0.0395 | 0.0371 |
+| **Total** | **146,400** | **139,898** | **6,502 (4.4%)** | | |
+
+The 15 Zenodo CSVs hold exactly 146,400 rows, reproducing the June 2026 verification file for file, and no row is dropped as an unmapped subreddit. `combine_sources()` then removes 6,502 rows that are exact duplicates on `(text, source, author_id)` (`src/data/combine.py`), giving 139,898 Reddit rows; the 140,086 total adds DAIC-WoZ's 188 participants. So the proposal counted the files and the loader counts the corpus, and nothing on disk has changed since June.
+
+**Which denominator this arithmetic should use.** The estimator sees the deduplicated corpus, not the raw files, so the shares should be the post-dedup column. The correction runs against the rare conditions: deduplication removes 3.2% of depression but 7.8% to 11.9% of the other three, so every rare class becomes rarer (bipolar moves from 0.0395 to 0.0371). In the table above the required diagonal falls as class share rises, so recomputing on post-dedup shares pushes the three rare conditions' thresholds further above 1 rather than below. The direction of the correction is therefore safe. That is an observation about the monotonicity of the table, not a re-derivation of it.
+
+**The UNVERIFIED flag above stands.** Only the provenance half of open item 4 is closed by this amendment. The formula itself, taken from Zhu, Song and Liu's Theorem 2, has still not been checked independently, and these counts should be plugged into it when it is. One refinement to make at that point: HOC ran on the training split (111,892 rows), not the full corpus, so the operative shares may be the train-split ones rather than either column here.
+
+**Links.** Depends on D-030 (C1 measures rather than assumes). Feeds open item 4. Records provenance held in `Docs/project-proposal.md` before that file leaves the repository.
 
 ---
 
@@ -1179,6 +1206,201 @@ Applies D-033.
 
 ---
 
+## D-041 · D-040 result: HOC's structure is stable, its magnitude is representation-dependent
+**Date:** 2026-08-09 · **Status:** ACTIVE · **Category:** C1
+
+**Result in one line.** Neither of D-040's headline branches fired. HOC's estimated
+bipolar noise rate moves from 4.6% to 45.9% purely as a function of which encoder
+produces the features, while the *ordering* of the four conditions and the estimator's
+internal confidence stay unchanged. The matrix is not identified; the ranking is.
+
+**Runs.** Both arms executed 2026-08-09 on Colab, 104 minutes total, using D-037's
+configuration verbatim (seeds 0 to 4, G = 50, |E| = 15000, max_iter = 1500, lr = 0.1,
+cosine, within-E). Arm A reused the D-036 base cache; Arm B extracted fresh into
+`embeddings/train__mpnet`.
+
+---
+
+### The pre-registered prediction, item by item
+
+D-040 recorded these before the run. Reproduced here verbatim in substance, with the
+verdict against each.
+
+| Prediction (D-040) | Outcome | Verdict |
+|---|---|---|
+| Arm A bipolar diagonal falls below 0.70 | 0.5409 | **held** |
+| Most likely into 0.05 to 0.45 | 0.5409 | **missed**, the drop was real but less severe than predicted |
+| Arm A `det(T)` degrades well below D-037's 0.92 | 0.2595 | **held** |
+| Arm B lands between Arm A and fine-tuned, and below 0.85 | 0.5409 < 0.7071 < 0.9534 | **held exactly** |
+| Arm-wise Pearson between HOC diagonal and 2-NN agreement stays above 0.9 | 0.9940 and 0.9952 | **held** |
+| Predicted branch for Arm A: NARROWED or DEGENERATE | DEGENERATE | **held** |
+
+**The prediction was directionally right and quantitatively too pessimistic.** The
+degenerate-limit reasoning in D-040 (if base-space consensus approaches independence,
+every row of T collapses to the noisy marginal and the bipolar diagonal approaches
+0.038) described the direction of travel correctly but overshot the distance. Arm A
+is part-way to that limit, not at it. Recording the miss matters more than the hit:
+the 0.05 to 0.45 range was reasoned from a mechanism, and the mechanism is only
+partially right.
+
+### Branches
+
+| Arm | Extractor | Bipolar diagonal | Cross-seed sd | Mean \|det\| | Branch |
+|---|---|---|---|---|---|
+| (D-037) | fine-tuned MentalBERT | 0.9534 | 0.0008 | 0.9238 | not a D-040 arm |
+| B | `all-mpnet-base-v2` | 0.7071 | 0.0104 | 0.5113 | **INDETERMINATE** |
+| A | base MentalBERT | 0.5409 | 0.0084 | 0.2595 | **DEGENERATE** |
+
+- **STRENGTHENED did not fire.** It required every non-fine-tuned arm at 0.85 or
+  above. Neither arm was close.
+- **NARROWED did not fire.** It required an arm below 0.70 *with HOC's assumptions
+  intact*. Arm A is below 0.70 but fails the pre-registered non-singularity bar.
+- **DISAGREE did not fire** on its pre-registered definition, which requires one arm
+  at 0.85 or above alongside one below 0.70.
+
+**Consequence for C1's scope: the claim does not narrow.** The NARROWED branch existed
+precisely to catch the outcome "the fine-tuning-artefact explanation is sufficient, so
+C1 applies only to fine-tuned representations." It did not fire, because removing the
+fine-tuning does not produce a usable matrix. It produces a collapsing one. Chapter 1
+therefore does **not** need the amendment D-040 provided for.
+
+### The degeneracy gate earned its place, and this is on record
+
+Read on its own, Arm A's 0.5409 looks like HOC recovering substantial real noise once
+the suppression is removed, which is the NARROWED reading. `det(T)` = 0.2595 against
+D-037's 0.9238 says otherwise: the rows are converging on one another. The gate was
+written into D-040 **before the numbers existed**, for exactly this ambiguity, and it
+is the only thing standing between this result and an incorrect amendment to Chapter 1.
+
+This is the discipline D-034 records the absence of. Note the contrast honestly: in
+D-034 the confound was articulated only after the result came back inconvenient, and
+was logged as motivated reasoning. Here the distinction was drawn in advance and the
+inconvenient reading is the one it blocked.
+
+### Per-condition diagonals across all three representations
+
+| true condition | fine-tuned | base | mpnet |
+|---|---|---|---|
+| depression | 0.9963 | 0.9577 | 0.9729 |
+| eating_disorder | 0.9950 | 0.8265 | 0.9210 |
+| schizophrenia | 0.9785 | 0.6448 | 0.8188 |
+| bipolar | 0.9534 | 0.5409 | 0.7071 |
+
+**Implied noise rate (1 minus the diagonal), with cleanlab from D-039 alongside:**
+
+| condition | HOC fine-tuned | HOC mpnet | HOC base | cleanlab (D-039) | spread |
+|---|---|---|---|---|---|
+| bipolar | 4.6% | 29.3% | 45.9% | 15.2% | **10x** |
+| schizophrenia | 2.2% | 18.1% | 35.5% | 10.1% | 16x |
+| eating_disorder | 0.5% | 7.9% | 17.4% | 3.2% | 35x |
+| depression | 0.4% | 2.7% | 4.2% | 2.1% | 11x |
+
+**The rank order is identical in all four columns**: depression, then eating disorder,
+then schizophrenia, then bipolar. Two independent estimators and three independent
+representations agree completely on which conditions are noisier and by what ordering,
+and disagree by an order of magnitude on how noisy any of them is.
+
+**This is the sharpest form the C1 result has taken.** D-039 established that two
+estimators disagree by a factor of three with no data-internal way to adjudicate.
+D-041 adds that a *single* estimator disagrees with itself by a factor of ten
+depending on which encoder it is handed, with each individual answer carrying a tight
+cross-seed spread (0.0008 to 0.0104) that excludes the others. There is no
+representation among the three at which HOC produces a matrix that can be trusted as
+a point estimate, and nothing in the estimator's own diagnostics selects between them.
+
+### The 2-NN coupling persists, and that is the finding
+
+| arm | Pearson, HOC diagonal vs 2-NN agreement |
+|---|---|
+| fine-tuned | 0.9985 |
+| base | 0.9940 |
+| mpnet | 0.9952 |
+
+D-037 measured this at 0.999 on the fine-tuned features and used it to argue that
+HOC's output there was a deterministic function of a statistic D-036 had shown to be
+largely manufactured by fine-tuning. **The open question was whether the coupling was
+itself an artefact of that representation. It is not.** It holds at 0.994 or above in
+three representations whose bipolar 2-NN agreement differs by roughly 60 percentage
+points (fine-tuned 86.7%, base 26.9% within-E). HOC's output tracks the 2-NN consensus
+structure of whatever space it is given, and that space is a free choice made by the
+practitioner.
+
+**Caveat that must travel with this number.** The correlation is computed across
+K = 4 conditions, so it has two degrees of freedom, and a high value is easy to attain
+whenever both quantities share a monotone ordering, which they do here by construction.
+Taken alone it is weak evidence. Its weight comes from three things together: it is
+reproduced at 0.994 or above in three representations, the mechanism predicts it a
+priori (HOC fits its matrix to 2-NN consensus counts), and D-040 pre-registered the
+above-0.9 threshold before the run. It also cannot distinguish "HOC's output is a
+function of 2-NN agreement" from "both are functions of the same underlying
+separability", but for the argument being made those are the same statement.
+
+### Arm B's verdict is knife-edge, and this is stated before anyone finds it
+
+Arm B's diagonal, 0.7071, sits **0.0071 above** the 0.70 narrow threshold. Its own
+cross-seed standard deviation is **0.0104**. The margin is smaller than one standard
+deviation. Its mean `|det|`, 0.5113, sits 0.0113 above the 0.5 non-singularity bar.
+
+The branch stands as it fired, because the thresholds were fixed in D-040 before the
+run and moving them now would void the entire exercise. But **INDETERMINATE versus
+NARROWED for Arm B is not robust to a threshold shifted by one hundredth**, and the
+thesis must say so wherever the branch is quoted. Nothing in this entry leans on Arm B's
+branch label; the load-bearing content is the diagonal values and the coupling, both of
+which are unaffected.
+
+### Confound and limitations, carried forward from D-040
+
+- **Neighbour starvation is identical across arms** and therefore does not invalidate
+  the comparison, because `sample_size` was fixed at 15000 in every arm. It does bound
+  what any arm can show: at |E| = 15000 a bipolar post has roughly 566 same-class
+  candidates versus roughly 4221 in the full split (D-036).
+- **Arm B does not test Theorem 5.5.** Liu et al.'s Definition 5.3 defines
+  disentanglement as conditional independence of feature components **given the true
+  label**, and true labels are unavailable here, so the property cannot be verified by
+  any run on this data. Arm B tests the weaker observable proxy D-040 specified.
+- **`all-mpnet-base-v2` is not purely self-supervised** in SimCLR's sense; it is
+  trained on large-scale sentence-pair data, so the analogy to Liu et al.'s middle row
+  is approximate.
+- **The claim this supports:** the failure to identify a magnitude persists across
+  representations that differ in how they were supervised. **The claim it does not
+  support:** that a fully disentangled representation would not rescue the estimator.
+
+### What this licenses for C2
+
+The structure/magnitude split is the useful output. Four independent estimates agree on
+the ordering and on bipolar being the noisiest condition, which is also the direction
+the clinical literature predicts (D-018, open item 6). None of them pin the magnitude,
+and their disagreement is not noise: each is internally tight and they are mutually
+exclusive. That is the precise shape of the input Sesia's Theorem 4 needs and cannot
+get from data: a **region** rather than a point. C2's elicitation supplies the
+magnitude as a region while inheriting a direction the data already agrees on.
+
+**Consequences.**
+
+- C1 is complete on three legs: two estimators (D-037, D-039) and three
+  representations (D-041). No further estimator or arm is needed to make the point.
+- Open item 1 is closed for every arm: per-seed spread, prior, determinant and
+  assumption flags are persisted per arm as `hoc_per_seed.csv`, and each arm's branch
+  as `hoc_d040_verdict.csv`.
+- D-040's prediction miss is added to the record. It is a pre-registered prediction
+  that was partly wrong, which is the fourth such entry and the reason this log is
+  worth having.
+
+**Still to append to this entry** (measured, not yet transcribed): the off-diagonal
+structure of each arm's mean T, specifically whether bipolar-to-depression remains the
+dominant off-diagonal as the representation changes, which is the clinically predicted
+direction and has been consistent across D-034, D-037 and D-039; each arm's estimated
+prior p against the observed noisy proportions; each arm's per-condition 2-NN agreement
+values; and the outcome of the `SentenceTransformer.encode()` parity check on Arm B's
+pooling. None of these change any branch above.
+
+**Links.** Reports the experiment pre-registered in D-040. Extends D-037's coupling
+finding to two further representations. Extends D-039's confident-disagreement finding
+from across-estimators to within-estimator-across-representations. Does **not** reverse
+D-035. Feeds C2 (D-027, D-028).
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
@@ -1212,10 +1434,10 @@ Applies D-033.
 
 | # | Item | Blocking | Owner |
 |---|---|---|---|
-| 1 | Run HOC and `cleanlab` on the real data | D-030 (C1 is currently an argument, not a measurement) | Soshan |
+| 1 | ~~Run HOC and `cleanlab` on the real data~~ **CLOSED 2026-08-09.** HOC on three representations (D-037, D-041) and cleanlab (D-039) all run; per-seed spread and prior persisted per arm | was D-030 | done |
 | 2 | Measure 2-NN *noisy*-label agreement per condition in MentalBERT space (**amended 2026-07-24: a one-sided falsification test, not confirmatory; see expanded note below**) | The clusterability diagnostic | Soshan |
 | 3 | Verify the `ρ = (Pᵀ)⁻¹ρ̃` derivation | D-028, D-031 | Soshan + supervisor |
-| 4 | Verify the prevalence arithmetic in D-018 against Zhu et al.'s Theorem 2 | The strongest result in the project | Soshan |
+| 4 | Verify the prevalence arithmetic in D-018 against Zhu et al.'s Theorem 2. **Counts half CLOSED 2026-08-14** (D-018 amendment: 146,400 raw vs 139,898 deduplicated, both correct, provenance recorded); the Theorem 2 formula check itself is still open | The strongest result in the project | Soshan |
 | 5 | Decide prune vs no-prune | D-031 | Soshan + supervisor |
 | 6 | Source every elicited range to a specific clinical study | The main attack on C2 | Soshan |
 | 7 | Read Bortolotti et al. (arXiv:2501.18060) in full | D-029 | Soshan |
@@ -1302,7 +1524,21 @@ The elicited set needs each range tied to a specific study. The *directions* are
 
 | Claims made from abstracts or snippets | 4 |
 | Of those, materially wrong | **4** |
-| Claims made after reading the full paper | 5 |
+| Claims made after reading the full paper | 6 |
 | Of those, materially wrong | **0** |
+| Pre-registered predictions recorded before a run | 4 |
+| Of those, held in full | 2 (D-035's rule, D-036/D-037) |
+| Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
 
 **This table is the argument for D-033.** Keep it updated. If it ever shows a wrong claim made after reading a full paper, that is worth knowing too.
+
+The sixth full-paper claim is D-040's, from Liu, Cheng and Zhang (2023): that there is
+a fourth identifiability route and that HOC's accuracy depends materially on the
+feature extractor. D-041 bore it out, and more strongly than expected: the bipolar
+diagonal moves from 0.5409 to 0.9534 across three encoders on identical data.
+
+**The second block is the more useful one, and it is deliberately separate.** A project
+that only recorded predictions it got right would be recording nothing. Two of four
+pre-registered predictions did not hold as stated, both are written up in full
+(D-034, D-041), and in both cases the pre-registration is what stopped the result being
+reinterpreted after the fact.
