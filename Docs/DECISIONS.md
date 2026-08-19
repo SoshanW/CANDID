@@ -68,7 +68,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-008 | Reject E-DAIC | CLOSED | Data |
 | D-009 | Aich et al. as a stretch goal, not a dependency | OPEN | Data |
 | D-010 | Author-grouped split, not stratified | ACTIVE | Engineering |
-| D-011 | MentalBERT with class-weighted loss as the baseline | ACTIVE | Engineering |
+| D-011 | MentalBERT with unweighted cross-entropy as the baseline (corrected 2026-08-18) | ACTIVE | Engineering |
 | D-012 | `src/` package in VS Code; notebooks as thin GPU runners | ACTIVE | Engineering |
 | D-013 | Follow the "Jazzify" thesis structure | ACTIVE | Writing |
 | D-014 | Adopt supervisor's prose rules | ACTIVE | Writing |
@@ -100,6 +100,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-040 | HOC on representations not trained on the project's labels (pre-registration) | ACTIVE | C1 |
 | D-041 | D-040 result: HOC's structure is stable, its magnitude is representation-dependent | ACTIVE | C1 |
 | D-042 | Sesia's Algorithm 2 interface pinned; degeneracy is closed-form, and it strengthens C1 | ACTIVE | C1/C2 |
+| D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
 ---
 
 # Part 1 · Scope and framing
@@ -290,16 +291,53 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 
 ---
 
-## D-011 · MentalBERT with class-weighted loss as the baseline
+## D-011 · MentalBERT with unweighted cross-entropy as the baseline
 **Date:** undated (Milestone 0 complete) · **Status:** ACTIVE · **Category:** Engineering
 
-**Decision.** Class-weighted MentalBERT fine-tune via a `WeightedLossTrainer` (HuggingFace `Trainer` subclass), inverse-frequency weighting. 3 epochs, batch size 16, 256-token cap.
+**Decision.** MentalBERT (`mental/mental-bert-base-uncased`) fine-tuned for multi-class classification on the proxy labels with a plain HuggingFace `Trainer` and unweighted cross-entropy. 3 epochs, batch size 16, 256-token cap.
 
 **Result.** 96% accuracy, 0.8782 macro-F1 on the held-out test set.
 
-**Reasoning.** Plain cross-entropy under 20:1 imbalance would let the model ignore bipolar entirely and still look accurate.
+**Reasoning.** Unweighted cross-entropy is the right loss for this baseline for three reasons that hold independently of how the entry came to be written.
 
-**Consequences.** The current loss handles *imbalance* but knows nothing about *label noise*.
+1. **C2 consumes the model's probabilities, and reweighting moves them.** Sesia's Algorithm 2 operates on the predicted class probabilities `π̂` (D-042). Inverse-frequency weighting shifts the fitted posterior away from the sampling distribution by design, so a reweighted head would hand the conformal step scores that no longer estimate `P(Y | X)` on the distribution the calibration set is drawn from. The unweighted head keeps the probabilities on the scale the downstream method expects, and any recalibration then happens once, in the open, in C2.
+2. **D-003 makes the imbalance evidence rather than a nuisance.** The argument is that the conditions with the least data are the conditions whose noise is hardest to estimate. A loss that flattens the class ratio suppresses exactly the effect the thesis is about, and it would leave the baseline table looking better on bipolar for a reason unrelated to whether bipolar is learnable from this text.
+3. **It keeps the C1 arms comparable.** D-035, D-036 and D-041 compare the geometry of the fine-tuned space against base MentalBERT and mpnet on identical data. A reweighted objective reshapes that geometry, and it would sit inside the fine-tuned arm as a confound with no counterpart in the other two.
+
+The result also answers the concern the weighting was meant to address: at 0.8782 macro-F1 under a 20:1 ratio, the model is plainly not ignoring bipolar. A macro-averaged metric would have exposed it if it were.
+
+**Imbalance is handled elsewhere, and not in the loss.** Four separate mechanisms carry it, each visible and each auditable on its own:
+
+- **The split** is author-grouped rather than stratified (D-010), with per-condition proportions verified empirically to within 0.6 percentage points and roughly 490 bipolar examples in each of validation and test.
+- **Reporting is per condition**, never pooled, throughout C0 and C1. Every diagnostic table in D-034 through D-041 is broken out by condition for this reason.
+- **Macro-F1 is the headline metric**, so a rare condition counts as much as a common one in the number that gets quoted.
+- **C2 targets label-conditional (Mondrian) coverage** rather than marginal coverage (D-029), which is where the per-condition guarantee is actually made rather than approximated by a loss term.
+
+**Consequences.** The baseline loss knows nothing about *label noise*, which is what C2 exists to address. It also does nothing about imbalance, which is deliberate per the above.
+
+---
+
+**Correction (2026-08-18).** This entry previously read: *"Class-weighted MentalBERT fine-tune via a `WeightedLossTrainer` (HuggingFace `Trainer` subclass), inverse-frequency weighting"*, with the reasoning *"Plain cross-entropy under 20:1 imbalance would let the model ignore bipolar entirely and still look accurate."* That describes a class weighting scheme that was documented but never implemented. No `WeightedLossTrainer` exists in this repository and none ever did: `src/modeling/train.py` constructs a plain `transformers.Trainer`, and the D-039 cleanlab cross-validation folds construct the same one.
+
+The 20:1 sentence is retained here as the rationale that was written down and then not carried into code. It is kept because it explains what an examiner will otherwise assume the baseline did, and because the Reasoning section above now takes the opposite position on its merits.
+
+*How it was caught.* Repository inspection during the D-044 write-up, searching for the class name the entry asserts and finding no definition. The code did not fail and no run misbehaved, so nothing would have surfaced this on its own: an unweighted `Trainer` trains cleanly, and the only symptom was a log entry describing a component that was not there. The mismatch had already been flagged at two call sites, `src/noise/oos_probabilities.py:21` and `notebooks/train_colab.ipynb`, where the note records that the folds match the actual unweighted baseline. D-011 itself was never brought into line, so the authoritative log was the last place still carrying the error, which is the failure mode the log is supposed to prevent.
+
+*What this does and does not change.* The D-039 folds are unaffected, since they reproduce whatever the baseline actually did and the baseline was unweighted throughout. What changes is the description and the justification: the reported macro-F1 comes from unweighted cross-entropy, and the reason for that is now recorded as a choice rather than left as an omission.
+
+---
+
+**Encoder choice: MentalBERT rather than MentalRoBERTa.**
+
+Recorded here for the first time, having been an undocumented assumption until 2026-08-18. No benchmarked comparison between the two encoders was run on this project's data. The choice rests on precedent and on comparability with prior mental-health screening work, which predominantly reports MentalBERT.
+
+Ji et al. (2022) release both variants, pretrained by continued domain-adaptive training on an identical corpus, so the comparison is close to a controlled one. Their own Tables 2 and 3 favour MentalRoBERTa on most of their evaluation datasets, including SWMH (F1 72.16 for MentalRoBERTa against 71.11 for MentalBERT). SWMH is the closest analogue to this project's task: multi-class, subreddit-derived, weakly labelled.
+
+This is a known viva exposure with no current answer. An examiner asking "why the weaker of the two encoders the same paper released?" would be entitled to one, and precedent alone is a thin reply when the authors' own numbers point the other way.
+
+**Commitment.** One MentalRoBERTa fine-tune, run under the identical protocol, splits and seed, reported as a **Milestone 0 baseline replication** and not as a C1 arm. The distinction matters: it is a robustness line under the baseline table, testing whether the C0 headline figure is encoder-specific. It does nothing for the corpus-overlap question in D-044, because MentalRoBERTa shares the identical pretraining corpus and therefore carries the identical exposure to the label-generating subreddits. Tracked as Part 7 open item 12.
+
+**Links.** Amended by D-044 (the pretraining corpus behind this encoder choice). Feeds the C0 result table.
 
 ---
 
@@ -749,6 +787,15 @@ manufactured nearly all of the apparent structure for the rare ones. In base
 space all three rare conditions sit at a similar lift over chance (roughly 7.5x),
 meaning the *differential* clusterability seen in D-034 was an artifact of the
 training objective rather than a property of the text.
+
+**Amendment (2026-08-18): DAPT exposure does not explain the base-space ordering.**
+D-044 maps which of the four label subreddits appear in MentalBERT's pretraining
+corpus, which raises the question of whether the base arm is quietly label-informed.
+The ordering in the table above rules that reading out: the two conditions with no
+corpus exposure bracket the sibling-exposed one rather than sitting on one side of
+it, and all three rare conditions land at the same lift over chance. Exposure and
+base-space separability are unrelated here. See D-044 for the exposure map and for
+what it does imply.
 
 **Base neighbour label distribution given centre label:**
 
@@ -1619,6 +1666,41 @@ Applies D-033. Pre-registration for the simulation deferred to D-043.
 
 ---
 
+## D-044 · Pretraining-corpus overlap between MentalBERT and the label-generating subreddits
+**Date:** 2026-08-18 · **Status:** ACTIVE · **Category:** C1/Data
+
+**Decision.** The overlap between MentalBERT's pretraining corpus and the subreddits that generate this project's proxy labels is recorded as a disclosed limitation, and the existing three-arm evidence is recorded as bounding its size.
+
+**Context.** MentalBERT is BERT-base-uncased continued with masked language modelling (MLM only; the paper does not use next sentence prediction) on posts crawled from r/depression, r/SuicideWatch, r/Anxiety, r/offmychest, r/bipolar, r/mentalillness and r/mentalhealth, totalling 13,671,785 sentences (Ji et al., 2022, section 2.2). The proxy label in this project is subreddit membership, so the pretraining corpus is drawn from the same kind of source as the labels themselves.
+
+**Per-condition exposure map.**
+
+| Condition | Label subreddit (Low et al.) | Exposure in MentalBERT's DAPT corpus |
+|---|---|---|
+| depression | r/depression | exact match with the DAPT corpus |
+| bipolar | r/bipolarreddit | sibling community; r/bipolar is in the corpus, r/bipolarreddit is not |
+| schizophrenia | r/schizophrenia | not in the corpus |
+| eating_disorder | r/EDAnonymous | not in the corpus |
+
+**What the paper does and does not report.** It reports the subreddit list and the sentence count. It reports no collection dates, no post count, no deduplication procedure and no filtering procedure. Overlap between the DAPT corpus and this project's evaluation data therefore cannot be excluded or confirmed from the primary source. The correct statement is **"cannot be established either way"**, not "likely" and not "near-certain". Anything stronger is a claim the paper does not support.
+
+**Reasoning: why this does not undermine D-035, D-036 or D-041.**
+
+- If DAPT exposure had made base MentalBERT label-informed, the base arm should sit closer to the fine-tuned arm than a label-naive encoder does. D-041 measures the opposite. Base MentalBERT's bipolar diagonal is 0.5409, against mpnet's 0.7071 and fine-tuned 0.9534. Base is the furthest of the three from the fine-tuned geometry, and the label-naive encoder is the one in between.
+- Exposure does not predict base-space separability either. D-036 base agreement runs 94.5% (exposed), 71.1% (unexposed), 41.2% (unexposed), 29.3% (sibling). On lift over chance the three rare conditions are indistinguishable at 7.45x, 7.53x and 7.77x, and depression's 1.16x is a ceiling effect at 81.2% base chance, as D-036 already records.
+- Consequence: base MentalBERT remains usable as a control, and the control is conservative rather than compromised. Whatever exposure it carries pushes the measurement in the direction that would weaken the argument, and the argument survives anyway.
+
+**Consequences.**
+
+- The Milestone 0 figure in D-011 carries an additional reason to be discounted, and the reason is unevenly distributed across conditions: text contamination is possible for depression, weaker for bipolar, and absent for schizophrenia and eating disorder. Uneven contamination is worse for per-condition metrics than uniform contamination would be, because it inflates one condition's apparent performance relative to the others rather than shifting the whole table.
+- C3 gains a limitation to state. Depression is the only condition with a satisfiable finite-sample guarantee under D-018, and it is also the only condition with exact-subreddit DAPT exposure. The two facts are independent in derivation: D-018's split comes from prevalence arithmetic on Zhu, Song and Liu's Theorem 2, not from anything about the encoder. The coincidence should be named in the thesis rather than left for a reader to find and read as circularity.
+
+**Evidence.** Ji et al. (2022), sections 2.1 and 2.2, Tables 2 and 3; Low et al. (2020) subreddit list; the D-036 base-agreement table and the D-041 per-condition diagonal table, as cited above.
+
+**Links.** Amends D-011. Bounds a confound in D-035 and D-036. Feeds the C3 limits analysis alongside D-018 and the neighbour-starvation finding in D-036.
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
@@ -1663,6 +1745,7 @@ Applies D-033. Pre-registration for the simulation deferred to D-043.
 | 9 | Aich et al. access outcome | D-009 | External |
 | 10 | Chapter 2 (Literature Review) draft | Next chapter | Soshan |
 | 11 | Re-verify novelty before camera-ready | D-017; the noisy-conformal area published 4+ items in 2024–25 | Soshan |
+| 12 | One MentalRoBERTa fine-tune, identical protocol, splits and seed, reported as a Milestone 0 baseline replication (not a C1 arm) | D-011; Ji et al.'s own Tables 2 and 3 favour MentalRoBERTa on SWMH | Soshan |
 
 ---
 
@@ -1727,6 +1810,7 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Zhu, Z., Song, Y. and Liu, Y. (2021) 'Clusterability as an alternative to anchor points when learning with noisy labels', ICML, PMLR 139, 12912–12923 | Killed D-024. Theorem 2 gives D-018's arithmetic. |
 | Zhu, Z., Wang, J. and Liu, Y. (2022) 'Beyond images: label noise transition matrix estimation for tasks with lower-quality features', ICML, PMLR 162 | Rescued the project. Evidence for D-030. |
 | Liu, Y., Cheng, H. and Zhang, K. (2023) 'Identifiability of label noise transition matrix', ICML, PMLR 202, 21475–21496 | Underpins D-018. Read in full 2026-08-09: it documents **four** identifiability routes, not three; the fourth (disentangled informative features, Theorem 5.5) prompted D-040. |
+| Ji, S., Zhang, T., Ansari, L., Fu, J., Tiwari, P. and Cambria, E. (2022) 'MentalBERT: publicly available pretrained language models for mental healthcare', LREC 2022, 7184–7190 | The encoder's provenance. Section 2.2 supplies the pretraining corpus for D-044; section 3.1 records that SWMH uses weak labels; section 6 states that the model predictions are not psychiatric diagnoses. Read in full 2026-08-18, correcting two prior claims (see the scoreboard). |
 
 ## Key references, cited but NOT yet read in full
 
@@ -1740,8 +1824,8 @@ The elicited set needs each range tied to a specific study. The *directions* are
 
 ## Reversal scoreboard
 
-| Claims made from abstracts or snippets | 4 |
-| Of those, materially wrong | **4** |
+| Claims made from abstracts or snippets | 6 |
+| Of those, materially wrong | **6** |
 | Claims made after reading the full paper | 7 |
 | Of those, materially wrong | **0** |
 | Of those, not yet tested against a run | 1 (D-042) |
@@ -1750,6 +1834,15 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
 
 **This table is the argument for D-033.** Keep it updated. If it ever shows a wrong claim made after reading a full paper, that is worth knowing too.
+
+The fifth and sixth abstract-derived claims were added on 2026-08-18, both about
+MentalBERT and both taken from secondary summaries rather than from Ji et al. (2022):
+(i) that its domain-adaptive pretraining used next sentence prediction alongside
+masked language modelling, and (ii) that its crawl window is documented and overlaps
+Low et al.'s collection windows. Both fail against the paper, which uses MLM only and
+reports no collection dates at all. Neither claim had become load-bearing before it
+was checked: (i) never entered an entry, and (ii) would have made D-044 assert
+contamination the primary source cannot support.
 
 The sixth full-paper claim is D-040's, from Liu, Cheng and Zhang (2023): that there is
 a fourth identifiability route and that HOC's accuracy depends materially on the
