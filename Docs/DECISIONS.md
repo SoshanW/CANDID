@@ -101,6 +101,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-041 | D-040 result: HOC's structure is stable, its magnitude is representation-dependent | ACTIVE | C1 |
 | D-042 | Sesia's Algorithm 2 interface pinned; degeneracy is closed-form, and it strengthens C1 | ACTIVE | C1/C2 |
 | D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
+| D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
 ---
 
 # Part 1 · Scope and framing
@@ -337,7 +338,53 @@ This is a known viva exposure with no current answer. An examiner asking "why th
 
 **Commitment.** One MentalRoBERTa fine-tune, run under the identical protocol, splits and seed, reported as a **Milestone 0 baseline replication** and not as a C1 arm. The distinction matters: it is a robustness line under the baseline table, testing whether the C0 headline figure is encoder-specific. It does nothing for the corpus-overlap question in D-044, because MentalRoBERTa shares the identical pretraining corpus and therefore carries the identical exposure to the label-generating subreddits. Tracked as Part 7 open item 12.
 
-**Links.** Amended by D-044 (the pretraining corpus behind this encoder choice). Feeds the C0 result table.
+**Links.** Amended by D-044 (the pretraining corpus behind this encoder choice). Result recorded in D-045. Feeds the C0 result table.
+
+**Amendment (2026-09-27).** The commitment above has been carried out. Result and decision recorded in D-045: MentalRoBERTa scores 0.8841 macro-F1 against this entry's 0.8782 (Δ +0.0060, test-set bootstrap 95% CI [−0.0021, +0.0139]), and MentalBERT is retained as the encoder of record. Open item 12 is closed.
+
+---
+
+## D-045 · MentalRoBERTa replication result: MentalBERT retained as the encoder of record
+**Date:** 2026-09-27 · **Status:** ACTIVE · **Category:** Engineering
+
+**Decision.** MentalBERT was retained as the encoder for C0, C1 and C2, and the MentalRoBERTa fine-tune was recorded as a robustness line under the C0 baseline table, marginally ahead of MentalBERT and not separable from it on macro-F1.
+
+**Knife-edge statement, first.** No numeric threshold separated "small" from "large" before the run. The only rule on record was qualitative, in notebook section 9b: *"a small gap supports the precedent argument; a large one is a limitation to state."* The classification below as "small" was therefore made after the number was seen. Two reference points existed before the run and both are used: Ji et al.'s own SWMH gap of 1.05 F1 points (D-011), and whether a test-set bootstrap interval excludes zero. This run is not counted as a pre-registered prediction on the scoreboard.
+
+**Context.** D-011 recorded the MentalBERT choice as resting on precedent, with Ji et al. (2022) Tables 2 and 3 favouring MentalRoBERTa, and committed to one MentalRoBERTa fine-tune under the identical protocol (open item 12). The run used notebook section 9b, writing to a separate `Models_roberta/` root.
+
+**Protocol integrity.** Only `--model-name` changed: 3 epochs, batch 16, LR 2e-5, 256 tokens, fp16, seed 42, unweighted cross-entropy, final-step checkpoint. Split fingerprints (SHA-256 of `hash_pandas_object`, first 16 hex) match on all three splits: train 111,892 rows `90162cd1b3d6678b`, val 13,967 `86ea56a8f2c55968`, test 14,039 `256e8754aa0700a8`. The prediction files are row-aligned.
+
+**Evidence.** One seed per encoder; raw numbers in full in `Docs/roberta-replication-results.md`.
+
+| Condition | Support | MentalBERT F1 | MentalRoBERTa F1 | ΔF1 | 95% CI (row bootstrap, 2,000) |
+|---|---|---|---|---|---|
+| depression | 11,351 | 0.9787 | 0.9806 | +0.0019 | [+0.0004, +0.0033] |
+| eating_disorder | 1,421 | 0.9451 | 0.9557 | +0.0106 | [+0.0034, +0.0178] |
+| schizophrenia | 786 | 0.8372 | 0.8368 | −0.0004 | [−0.0167, +0.0151] |
+| bipolar | 481 | 0.7516 | 0.7635 | +0.0118 | [−0.0088, +0.0336] |
+| **macro-F1** | 14,039 | **0.8782** | **0.8841** | **+0.0060** | [−0.0021, +0.0139]; author-clustered [−0.0015, +0.0137] |
+| accuracy | 14,039 | 0.9605 | 0.9634 | +0.0029 | McNemar exact p = 0.0196 (120 BERT-only correct, 160 RoBERTa-only) |
+
+Probability quality: NLL 0.1904 vs 0.1896; 15-bin ECE 0.0311 vs 0.0299. Minority-to-depression confusions: bipolar 116 vs 107, eating_disorder 79 vs 55, schizophrenia 133 vs 128. The two encoders agree on 97.72% of test predictions.
+
+**Reasoning.**
+
+1. **The gap is small on both pre-existing reference points.** +0.60 macro-F1 points is in the direction Ji et al. report and below their 1.05-point SWMH gap, and the macro-F1 bootstrap interval, row-level and author-clustered, includes zero.
+2. **The direction is real on the pooled measure, and this is stated rather than hidden.** McNemar on per-row correctness gives p = 0.0196, and the depression and eating_disorder F1 intervals exclude zero. The pooled measure is 81% depression; the macro measure, which is the project's headline (D-003, D-011), is driven by the two rarest conditions and does not separate. The accurate statement is "MentalRoBERTa is marginally better; the headline gap is not resolved from zero by test-set resampling, and training-seed variance is unmeasured."
+3. **Everything C1 and C2 depend on replicates.** The per-condition F1 ranking (depression > eating_disorder > schizophrenia > bipolar), depression as the dominant confusion sink, and the calibration of the softmax that Sesia's Algorithm 2 consumes (D-042) are all unchanged. The C1 finding is about structure versus magnitude across representations (D-041); a half-point encoder difference on the classifier does not bear on it.
+4. **Switching would cost the comparability that C1 is built on.** D-035, D-036, D-038, D-039 and D-041 all use MentalBERT, fine-tuned or base. Moving C2 to MentalRoBERTa would place the abstention layer on a representation that none of the C1 diagnostics measured, in exchange for a gain the headline metric cannot distinguish from zero.
+
+**Consequences.**
+
+- The viva answer to "why the weaker encoder?" is now empirical: on this data, under the identical protocol, the encoder choice moves macro-F1 by 0.006, not separable from zero on the headline metric, with identical error structure. The answer concedes that MentalRoBERTa is nominally ahead on three of four conditions.
+- The C0 baseline table gains a MentalRoBERTa row, reported with the caveats above. The MentalBERT figure of 0.8782 remains the baseline of record.
+- No C1 arm is rerun on MentalRoBERTa. A MentalRoBERTa C1 arm would be a new decision with its own pre-registration.
+- Nothing here addresses D-044: both encoders share the identical pretraining corpus.
+
+**Limitations carried forward.** One training seed per encoder. Threshold for "small" set post hoc (stated above). Proxy labels, in-distribution Reddit test set only.
+
+**Links.** Resolves the D-011 commitment and closes open item 12. Leaves D-044 unchanged. Feeds the C0 result table.
 
 ---
 
@@ -1745,7 +1792,7 @@ Applies D-033. Pre-registration for the simulation deferred to D-043.
 | 9 | Aich et al. access outcome | D-009 | External |
 | 10 | Chapter 2 (Literature Review) draft | Next chapter | Soshan |
 | 11 | Re-verify novelty before camera-ready | D-017; the noisy-conformal area published 4+ items in 2024–25 | Soshan |
-| 12 | One MentalRoBERTa fine-tune, identical protocol, splits and seed, reported as a Milestone 0 baseline replication (not a C1 arm) | D-011; Ji et al.'s own Tables 2 and 3 favour MentalRoBERTa on SWMH | Soshan |
+| 12 | ~~One MentalRoBERTa fine-tune, identical protocol, splits and seed, reported as a Milestone 0 baseline replication (not a C1 arm)~~ **CLOSED 2026-09-27** (D-045): 0.8841 vs 0.8782 macro-F1, splits fingerprint-matched, MentalBERT retained | was D-011 | done |
 
 ---
 
@@ -1832,6 +1879,10 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Pre-registered predictions recorded before a run | 4 |
 | Of those, held in full | 2 (D-035's rule, D-036/D-037) |
 | Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
+
+The D-045 MentalRoBERTa replication is deliberately absent from the prediction block. Its
+only rule was qualitative ("small gap" versus "large gap") with no threshold fixed before the
+run, so it does not qualify as a pre-registered prediction and is not counted as held.
 
 **This table is the argument for D-033.** Keep it updated. If it ever shows a wrong claim made after reading a full paper, that is worth knowing too.
 

@@ -104,6 +104,10 @@ Canonical run — `MyDrive/mental-health-fyp/Models/`:
 
 Fast run — `MyDrive/mental-health-fyp/Models_fast/` (1-epoch, same layout).
 
+Encoder replication — `MyDrive/mental-health-fyp/Models_roberta/` (MentalRoBERTa,
+identical protocol, same layout). Macro-F1 0.8841; see
+[`roberta-replication-results.md`](roberta-replication-results.md) and D-045.
+
 ---
 
 ## 7. Caveats / limitations

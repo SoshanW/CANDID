@@ -1,6 +1,6 @@
 # Project Progress & Roadmap — resume-from-here reference
 
-_Last updated: 2026-08-14. This is the single "where are we / what's next" document.
+_Last updated: 2026-09-27. This is the single "where are we / what's next" document.
 Read §0, then jump to §5 "Next action when you resume."_
 
 _Authority note: `Docs/DECISIONS.md` is the authoritative record for every claim and
@@ -13,6 +13,8 @@ DECISIONS.md wins._
 
 - **C0 (baseline) is DONE.** MentalBERT fine-tuned 2026-07-07 on Colab. Held-out
   macro-F1 **0.8782**, accuracy 0.9605. Full record in `Docs/baseline-results.md`.
+  MentalRoBERTa replication (D-045, 2026-09-27): 0.8841 under the identical protocol,
+  not separable on macro-F1; MentalBERT retained as the encoder of record.
 - **C1 (noise-estimator diagnostic) is COMPLETE on three legs** — two estimators
   (HOC, cleanlab) and three representations (fine-tuned MentalBERT, base MentalBERT,
   `all-mpnet-base-v2`). D-041 closed it on 2026-08-09. **No further estimator or arm
@@ -55,7 +57,7 @@ Three datasets:
 
 | Phase | What it is | Status | Evidence |
 |---|---|---|---|
-| **C0 — baseline** | Naive MentalBERT multi-class fine-tune on proxy labels; raw softmax confidence | **DONE** 2026-07-07 | `Docs/baseline-results.md` |
+| **C0 — baseline** | Naive MentalBERT multi-class fine-tune on proxy labels; raw softmax confidence | **DONE** 2026-07-07; encoder replication 2026-09-27 | `Docs/baseline-results.md`, D-045 |
 | **C1 — noise-estimator diagnostic** | Run HOC + cleanlab on the real data and measure whether the no-clean-data estimators are usable | **COMPLETE** 2026-08-09 | D-034, D-036, D-037, D-038, D-039, D-040, D-041 |
 | **C2 — noise-coupled calibrated abstention** | Sesia's Algorithm 2 fed a clinically elicited *region* rather than a point estimate | **INPUT SIDE ONLY** (D-042); the claim itself untested | design in D-027, D-028, D-029, D-031, D-032 |
 | **C3 — identifiability-under-shift eval** | Synthetic recovery test, per-condition degradation curves, Reddit → DAIC shift | **NOT STARTED** | design in D-032 |
@@ -123,6 +125,13 @@ author-grouped 0.80/0.10/0.10 (train 111,892 / val 13,967 / test 14,039).
 Dominant error mode: minority classes misclassified as depression. Three epochs gave
 no improvement over one, which is the evidence that performance is bounded by
 proxy-label noise rather than model capacity — the motivation for C1.
+
+**Encoder replication (D-045).** MentalRoBERTa under the identical protocol and
+fingerprint-matched splits: accuracy 0.9634 · macro-F1 **0.8841** (Δ +0.0060,
+test-set bootstrap 95% CI [−0.0021, +0.0139]) · per-condition F1: depression 0.9806,
+eating_disorder 0.9557, schizophrenia 0.8368, bipolar 0.7635. Same condition ranking,
+same depression confusion sink, ECE 0.030 vs 0.031. One seed per encoder. MentalBERT
+stays the encoder of record. Full record in `Docs/roberta-replication-results.md`.
 
 ### C1 diagnostic — implied noise rate (1 minus the diagonal)
 
@@ -360,6 +369,9 @@ and the degradation curves.
   split code warns rather than fails. No code change needed to add them.
 - **Class imbalance ~24:1** is why macro-F1 is the headline metric, and it is also why
   three of four conditions have no finite-sample guarantee under D-018.
+- **Encoder choice (D-011) is now evidenced, with one caveat.** D-045 closed open
+  item 12. The "small gap" classification had no threshold fixed before the run, and
+  each encoder has one training seed; both are stated in D-045.
 - **The C0 checkpoint is final-step, not best-epoch** (a consequence of step-based
   saving). Three epochs matched one, so this is unlikely to matter.
 
@@ -388,6 +400,8 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-09-27** — MentalRoBERTa replication recorded (D-045); C0 row and §4 updated,
+  open item 12 closed.
 - **2026-08-14** — rewritten. The previous version was dated 2026-07-01 and stated
   "no MentalBERT fine-tune has run yet", five weeks and eight decision entries behind
   reality. C0 and C1 marked complete; §5 replaced with the C2 POC plan.
