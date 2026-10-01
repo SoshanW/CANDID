@@ -291,13 +291,14 @@ known. It is worth having on its own.
 
 ### Step 7 — PRE-REGISTER before arm (c) runs
 
-Write **D-042** in DECISIONS.md fixing branches and thresholds *before the numbers
-exist*. The project's own scoreboard is the reason: two of four pre-registered
+Write **D-043** in DECISIONS.md fixing branches and thresholds *before the numbers
+exist*. (D-043 is the number D-042 reserved for this pre-registration; D-044 and D-045
+were taken by other work in the meantime.) The project's own scoreboard is the reason: two of four pre-registered
 predictions did not hold, and in both cases the pre-registration is what stopped the
 result being reinterpreted after the fact (D-034, D-041).
 
 Note the change of role forced by Step 1. The closed-form analysis already predicts
-degeneracy at region B, so D-042 is no longer predicting *whether* it degenerates. It
+degeneracy at region B, so D-043 is no longer predicting *whether* it degenerates. It
 should pre-register the quantities the closed form cannot give:
 
 | To pre-register | Why it is still open |
@@ -313,7 +314,7 @@ derivation nobody tested.
 ### Step 8 — Arm (c), region input at the real width
 
 Feed the region A and region B boxes from `c2-interface.md` §6. Measure per-class
-coverage, mean set size, and the full-set rate. Fire the D-042 branches.
+coverage, mean set size, and the full-set rate. Fire the D-043 branches.
 
 ### Step 9 — The sweep, now a check on Step 3
 
@@ -325,7 +326,7 @@ noise-heterogeneity sweep on the same harness.
 width w*, and this project's proxy noise sits above it" is a publishable finding even
 if arm (c) loses, and Step 1 has already located w* to within a transcription.
 
-### Step 10 — Write the result up as D-043
+### Step 10 — Write the result up as D-046
 
 Branch fired, predictions held or missed, and the consequence for C2's scope. Update
 the reversal scoreboard either way.
@@ -341,7 +342,6 @@ and the degradation curves.
 
 ## 6. Open items and caveats
 
-- **`Docs/DECISIONS.md` has uncommitted changes** (the D-041 entry). Commit it.
 - **Prevalence counts: the apparent disagreement is RESOLVED (2026-08-14), the
   arithmetic is still unverified.** Both totals are correct and count different
   things: the 15 Zenodo CSVs hold exactly 146,400 rows (the figure D-018 uses, sourced
@@ -400,6 +400,9 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-01** — Housekeeping: Step 7 pre-registration renumbered D-042 → D-043 (the
+  number D-042 reserved), Step 10 write-up → D-046; stale "commit D-041" open item
+  removed.
 - **2026-09-27** — MentalRoBERTa replication recorded (D-045); C0 row and §4 updated,
   open item 12 closed.
 - **2026-08-14** — rewritten. The previous version was dated 2026-07-01 and stated

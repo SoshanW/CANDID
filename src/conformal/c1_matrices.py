@@ -3,11 +3,11 @@
 Every matrix here is ``T[l, k] = P[Ytilde = k | Y = l]`` with rows in
 ``CONDITIONS`` order and summing to one.
 
-Three of the four are transcribed from measured run artifacts. The fourth (the base
-MentalBERT arm of D-041) is **constructed** from its published diagonal and is marked
-as such, because ``Models/embeddings/train__base/`` holds only ``features.npy`` and
-``metadata.csv``: that arm's HOC output has not been brought down from Drive. Pulling
-it is the remaining half of step 2 of the C2 proof-of-concept.
+All four are transcribed from measured run artifacts. The base MentalBERT arm of D-041
+was originally constructed from its published diagonal; its HOC output was brought
+down from Drive on 2026-08-14 (step 2 of the C2 proof-of-concept) and replaced the
+construction. :func:`build_from_diagonal` is kept only for that historical
+cross-check, and nothing in a region uses it.
 
 Provenance, all under ``Models/embeddings/`` (gitignored, so the values are transcribed
 here rather than loaded):
@@ -17,7 +17,7 @@ arm                  source                      status
 ===================  ==========================  =================================
 HOC fine-tuned       ``train/hoc_mean_T_rerun``  measured; the run D-037 reports
 HOC mpnet            ``train__mpnet/hoc_mean_T`` measured; D-041 Arm B
-HOC base             diagonal only, D-041        CONSTRUCTED, arm A output not local
+HOC base             ``train__base/hoc_mean_T``  measured; D-041 Arm A
 cleanlab             D-039                       measured
 ===================  ==========================  =================================
 
