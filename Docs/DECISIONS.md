@@ -102,6 +102,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-042 | Sesia's Algorithm 2 interface pinned; degeneracy is closed-form, and it strengthens C1 | ACTIVE | C1/C2 |
 | D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
 | D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
+| D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
 ---
 
 # Part 1 · Scope and framing
@@ -179,7 +180,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 
 **Reasoning.** Stated preference for honest framing over overclaiming. Also strategic: a named limitation is a demonstration of understanding; a discovered one is a failure of it.
 
-**Current instances.** The elicitation-validity assumption (D-031); the Ding pooling tension; the Theorem 1 versus Theorem 2 distinction in the prevalence table; the DAIC-WoZ construct-validity problems.
+**Current instances.** The elicitation-validity assumption (D-031); the Ding pooling tension; the Theorem 1 versus Theorem 2 distinction in the prevalence table; the DAIC-WoZ construct-validity problems; the closed-world limit of a 4×4 contamination model, which has no row for authors with none of the four conditions (added 2026-10-08, D-047).
 
 ---
 
@@ -1748,6 +1749,92 @@ Applies D-033. Pre-registration for the simulation deferred to D-043.
 
 ---
 
+## D-047 · Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis
+**Date:** 2026-10-08 · **Status:** ACTIVE · **Category:** C2
+
+**This entry is a derivation, not a run**, in the same sense as D-042. Working document:
+`Docs/c2-elicitation-scoping.md`. Code: `src/conformal/elicited_region.py`, reproduced by
+`python -m src.conformal.elicited_region`, with `tests/test_conformal_elicited_region.py`
+pinning the numbers below.
+
+**Decision.** Open item 6 is re-scoped. The elicitation's success criterion is a floor on
+the worst-case **positive predictive value (PPV) of each rare label**: the share of posts
+in r/bipolarreddit, r/schizophrenia and r/EDAnonymous written by someone who truly has
+that condition. For bipolar at α = 0.10 and n\* = 481 the floor is about 0.78. The three
+directional claims originally listed under open item 6 are kept, as sources for wide
+ranges on entries the budget barely sees.
+
+**Context.** D-042 supplied the budget (bipolar 0.378). Roadmap step 3b asked whether a
+defensible reading of the clinical literature yields a region that fits under it. An
+elicited region is a set of transition matrices, so it was modelled as independent
+intervals on the off-diagonals of `T`, propagated to a box on V by vertex enumeration
+(deterministic containment, α_V = 0), with an interior check that no sampled point
+escaped.
+
+**What the arithmetic shows.**
+
+1. **Row k of V is built from the posts carrying label k.** Truly bipolar posts landing
+   in r/depression leave the bipolar row of M at exactly (1, 0, 0, 0); the budget does
+   not see the direction diagnostic delay predicts. Inflow into a rare label from
+   depression is amplified by about ρ_depression / ρ̃_bipolar ≈ 21. As single entries
+   with no width, depression → bipolar exhausts bipolar's budget at **1.3%**, depression
+   → schizophrenia at 1.9% and depression → eating disorder at 3.5%, while bipolar →
+   depression breaks only depression's budget, at 87.65%.
+2. **Jointly, the cheap entries stop being cheap.** Region R0 takes the three directions
+   wide (leakage into r/depression up to 60% and 40%), allows rare-to-rare inflow up to
+   10%, and has **no** depression-to-rare inflow. Bipolar still degenerates robustly
+   (mass 1.147, δ_ci 0.2457) and schizophrenia borderline. Leakage into depression
+   raises the recovered clean prevalence of the rare conditions, which multiplies every
+   rare-to-rare inflow.
+3. **The frontier.** F1 (leakage ≤ 40%, rare-to-rare and depression-to-rare ≤ 0.5%)
+   passes all four, bipolar mass 0.192, worst-case bipolar PPV 0.873. F3 (as F1 but
+   depression → bipolar ≤ 1%) degenerates borderline, 0.392, PPV 0.763. L1 (PPV 0.45)
+   degenerates robustly at 1.492. Across a grid of region shapes the lowest worst-case
+   bipolar PPV that passed was 0.744 and the highest that failed 0.780.
+4. The deduplicated prior from the D-018 amendment moves nothing material (0.8% passes,
+   1% fails borderline).
+
+**What the literature shows** (read status in the working document).
+
+- Zimmerman, Ruggero, Chelminski and Young (2010): of 700 outpatients, 145 reported a
+  prior bipolar diagnosis and 82 (56.6%) were not confirmed by the SCID, 68 of whom had
+  lifetime major depression. The label's PPV in that clinic is 63/145 = **0.43**
+  (derived, not stated).
+- Birnbaum et al. (2017): 146 of 671 Twitter schizophrenia self-disclosers appraised
+  genuine by clinicians (0.22; 0.37 counting "maybe"). Ernala et al. (2019): 153 of 635.
+- **No study located measures the clinical validity of subreddit membership.** The
+  clinic rate cannot transfer as a Reddit rate: 11% depression → bipolar would exceed the
+  whole observed bipolar share, and the recovered prevalence leaves the simplex.
+- Most documented contamination comes from people with none of the four conditions
+  (jokes and quotes; borderline personality disorder and PTSD in the overdiagnosed
+  group). A 4×4 model cannot represent it.
+
+**Consequences.**
+
+- **Projected at the C0 operating point:** bipolar inadmissible under any region the
+  located literature supports; depression and eating disorder admissible in every region
+  tested; schizophrenia open, pending a PPV the literature does not pin. This is D-032's
+  characterisation branch in per-condition form, unless a structured elicitation can
+  defend a bipolar PPV floor near 0.8.
+- **A literature-leaning elicited region and C1's spread fail by similar factors**: L1 at
+  1.49 against region B at 1.354, for different reasons. That parallel belongs in the
+  thesis.
+- **D-031 does not decide the bipolar verdict.** Pruning removes only the part of a region
+  beyond the simplex ceiling (about 4.7% depression → bipolar); the budget is exhausted
+  near 1%, so no region between those points is rescued by pruning.
+- **A new decision is needed** (open item 14): whether to elicit PPVs directly. That is
+  Sesia's direction, which D-028 set aside because a PPV depends on prevalence. For a PPV
+  asked about these specific communities that objection weakens, but the change of
+  direction must be recorded as a decision if taken.
+- The closed-world limit joins Assumption 1 under D-019.
+- D-043's pre-registration should carry these per-condition predictions so that the
+  simulation can confirm or move them.
+
+**Links.** Consumes D-042. Re-scopes open item 6. Bears on D-028, D-031, D-032 and D-043.
+Applies D-019 and D-033.
+
+---
+
 # Part 6 · Writing
 
 ## D-013 · Follow the "Jazzify" thesis structure
@@ -1786,13 +1873,15 @@ Applies D-033. Pre-registration for the simulation deferred to D-043.
 | 3 | Verify the `ρ = (Pᵀ)⁻¹ρ̃` derivation | D-028, D-031 | Soshan + supervisor |
 | 4 | Verify the prevalence arithmetic in D-018 against Zhu et al.'s Theorem 2. **Counts half CLOSED 2026-08-14** (D-018 amendment: 146,400 raw vs 139,898 deduplicated, both correct, provenance recorded); the Theorem 2 formula check itself is still open | The strongest result in the project | Soshan |
 | 5 | Decide prune vs no-prune | D-031 | Soshan + supervisor |
-| 6 | Source every elicited range to a specific clinical study | The main attack on C2 | Soshan |
+| 6 | Source every elicited range to a specific clinical study. **Re-scoped 2026-10-08 (D-047):** the binding quantity is the worst-case PPV of each rare label (about 0.78 for bipolar at α = 0.10), not the misdiagnosis directions. Non-binding entries are partly sourced; the binding ones have no subreddit-level study | The main attack on C2 | Soshan |
 | 7 | Read Bortolotti et al. (arXiv:2501.18060) in full | D-029 | Soshan |
 | 8 | Read Ding et al. (arXiv:2306.09335) in full | One leg of C3's convergence table is from a snippet | Soshan |
 | 9 | Aich et al. access outcome | D-009 | External |
 | 10 | Chapter 2 (Literature Review) draft | Next chapter | Soshan |
 | 11 | Re-verify novelty before camera-ready | D-017; the noisy-conformal area published 4+ items in 2024–25 | Soshan |
 | 12 | ~~One MentalRoBERTa fine-tune, identical protocol, splits and seed, reported as a Milestone 0 baseline replication (not a C1 arm)~~ **CLOSED 2026-09-27** (D-045): 0.8841 vs 0.8782 macro-F1, splits fingerprint-matched, MentalBERT retained | was D-011 | done |
+| 13 | Read the PDFs behind D-047: Zimmerman et al. (2010), Ernala et al. (2019) and Dagani et al. (2017), read so far only through a fetch tool, and Judd et al. (2002, 2003), Etchecopar-Etchart et al. (2021) and Hudson et al. (2007), not yet accessed | D-033 | Soshan |
+| 14 | Decide whether to elicit label PPVs directly (Sesia's direction) rather than T, and with what protocol | D-047, D-028 | Soshan + supervisor |
 
 ---
 
@@ -1846,6 +1935,8 @@ The elicited set needs each range tied to a specific study. The *directions* are
 
 **WARNING.** These three claims were stated from general knowledge during this session and are **exactly the kind of thing that sounds right and turns out subtly wrong.** Each needs a citation to a specific study. Where the literature is thin, **the range goes wide**, and the envelope honestly propagates that width into wider prediction sets. That propagation is a feature: vagueness becomes visible instead of hidden.
 
+**Amendment (2026-10-08, D-047): these three claims do not bind.** The budget sees posts *entering* a label, not posts leaving it. Bipolar → depression (claim 1) changes only depression's row, and is affordable up to about 60%. What exhausts bipolar's budget is depression → bipolar, near 1% of depressed authors' posts, equivalently a worst-case PPV for r/bipolarreddit below about 0.78. The sources needed are therefore on the validity of the rare labels, and the closest located (Zimmerman et al., 2010; Birnbaum et al., 2017; Ernala et al., 2019) sit at 0.22 to 0.43 in other populations. See `Docs/c2-elicitation-scoping.md` §4.
+
 ---
 
 ## Key references, verified by reading the full paper
@@ -1866,6 +1957,11 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Ding et al. (2023, NeurIPS), 'Class-conditional conformal prediction with many classes', arXiv:2306.09335 | One leg of C3's convergence table. |
 | Bortolotti et al. (2025), arXiv:2501.18060 | Bears on D-029. |
 | Einbinder et al. (2024), *JMLR* 25(328), 1–66 | Context-setting only; lower risk. |
+| Zimmerman et al. (2010), *J Clin Psychiatry*, 'Psychiatric diagnoses in patients previously overdiagnosed with bipolar disorder' | Load-bearing for D-047. Full text read only through a fetch tool; read the PDF and confirm volume and pages. |
+| Ernala et al. (2019), CHI | Full text read only through a fetch tool. The paper gives both 153 and 146 genuine self-reporters. |
+| Birnbaum et al. (2017), *JMIR* 19(8), e289 | Full text read through a fetch tool; open access, low cost to confirm. |
+| Dagani et al. (2017), *Can J Psychiatry* | Non-binding entry only. Fetch tool; confirm volume and pages. |
+| Zimmerman et al. (2008); Hirschfeld et al. (2003); Jagfeld et al. (2021) | Abstract only. Do not characterise beyond the abstract. |
 
 ---
 

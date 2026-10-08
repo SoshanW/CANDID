@@ -1,6 +1,6 @@
 # Project Progress & Roadmap — resume-from-here reference
 
-_Last updated: 2026-10-01. This is the single "where are we / what's next" document.
+_Last updated: 2026-10-08. This is the single "where are we / what's next" document.
 Read §0, then jump to §5 "Next action when you resume."_
 
 _Authority note: `Docs/DECISIONS.md` is the authoritative record for every claim and
@@ -30,10 +30,17 @@ DECISIONS.md wins._
   region. **C2's actual claim has not been tested.**
 - **C3 (shift evaluation) has NOT STARTED.** DAIC-WoZ loads (188 participants) but is
   not wired into any evaluation.
-- **Immediately next:** §5 step 3b, **scoping the clinical elicitation against a
-  numeric budget**. The elicited region's off-diagonal mass must stay under 0.378 for
-  bipolar at α = 0.10. That is where C2's contribution begins, and it is now the
-  critical path. The simulation arms (steps 4 to 10) follow it, not the reverse.
+- **Step 3b (elicitation scoping) is DONE as a derivation (D-047, 2026-10-08).** The
+  budget binds on posts *entering* the rare labels, not on misdiagnosis: bipolar needs a
+  worst-case PPV of about **0.78** for r/bipolarreddit (depression → bipolar near 1% or
+  less). The closest measured analogues sit at 0.22 to 0.43, and no subreddit-level
+  study exists. Projected: bipolar inadmissible at the C0 operating point, depression and
+  eating disorder admissible, schizophrenia open. Full record:
+  `Docs/c2-elicitation-scoping.md`.
+- **Immediately next:** take D-047 to the supervisor with open items 3, 5 and 14 (verify
+  D-028's conversion; prune or not; whether to elicit label PPVs directly). Then §5 step
+  4, the synthetic generator, with D-043 pre-registering D-047's per-condition
+  predictions.
 
 ---
 
@@ -59,7 +66,7 @@ Three datasets:
 |---|---|---|---|
 | **C0 — baseline** | Naive MentalBERT multi-class fine-tune on proxy labels; raw softmax confidence | **DONE** 2026-07-07; encoder replication 2026-09-27 | `Docs/baseline-results.md`, D-045 |
 | **C1 — noise-estimator diagnostic** | Run HOC + cleanlab on the real data and measure whether the no-clean-data estimators are usable | **COMPLETE** 2026-08-09 | D-034, D-036, D-037, D-038, D-039, D-040, D-041 |
-| **C2 — noise-coupled calibrated abstention** | Sesia's Algorithm 2 fed a clinically elicited *region* rather than a point estimate | **INPUT SIDE ONLY** (D-042); the claim itself untested | design in D-027, D-028, D-029, D-031, D-032 |
+| **C2 — noise-coupled calibrated abstention** | Sesia's Algorithm 2 fed a clinically elicited *region* rather than a point estimate | **INPUT SIDE ONLY** (D-042); elicitation scoped against the budget (D-047); the claim itself untested | design in D-027, D-028, D-029, D-031, D-032, D-047 |
 | **C3 — identifiability-under-shift eval** | Synthetic recovery test, per-condition degradation curves, Reddit → DAIC shift | **NOT STARTED** | design in D-032 |
 | Optional — symptom-alignment signal | Per-post DSM-5/ICD-11 symptom-match score | dropped unless time permits | — |
 
@@ -104,6 +111,7 @@ locally and on Colab: `config.py`, `labels.py`, `splits.py`, `dataset.py`,
 |---|---|
 | `v_region.py` | T → M → V conversion, the containment region, and the closed-form degeneracy test |
 | `c1_matrices.py` | C1's transition matrices transcribed from DECISIONS.md; the two constructed ones flagged in their docstrings |
+| `elicited_region.py` | an elicited T-box propagated to Sesia's V-box, the degeneracy test on it, worst-case label PPV, and the constructed scoping regions of D-047 |
 | `__main__.py` | `python -m src.conformal` reproduces every table in `Docs/c2-interface.md` §6 |
 
 **Not built:** the conformal calibration itself (arms a, b, c), the synthetic
@@ -242,17 +250,43 @@ calibration fraction) for Chapter 4. The numbers exist; the figure does not.
 
 This is D-032's sweep and it no longer needs a simulation to produce its main curve.
 
-### Step 3b — Scope the elicitation against the budget (open item 6)
+### Step 3b — Scope the elicitation against the budget (open item 6). ✅ SCOPED 2026-10-08
 
 **This is where C2's actual contribution starts, and it is now the critical path.**
 Nothing before this step tests C2's claim. The question is whether a defensible reading
 of the clinical literature yields a region whose off-diagonal mass fits under 0.378 for
 bipolar.
 
+**Result (D-047, `Docs/c2-elicitation-scoping.md`).** A region can fit all four budgets,
+but the binding entries are not the ones open item 6 listed. Bipolar's row of V is
+built from posts carrying the bipolar label, so bipolar → depression leakage is
+invisible to it and affordable up to about 60%. What exhausts it is inflow: depression →
+bipolar near 1%, equivalently a worst-case PPV for r/bipolarreddit below about 0.78.
+
+| Region (constructed) | Depression → bipolar | Bipolar mass (budget 0.378) | Verdict | Worst-case bipolar PPV |
+|---|---|---|---|---|
+| F1 | ≤ 0.5% | 0.192 | ok | 0.873 |
+| F3 | ≤ 1% | 0.392 | degenerate, borderline | 0.763 |
+| L1 | ≤ 2.4% | 1.492 | degenerate, robust | 0.450 |
+
+The closest measured PPVs are 0.43 (a self-reported prior bipolar diagnosis in an
+outpatient clinic) and 0.22 to 0.24 (schizophrenia self-disclosure on Twitter). No study
+measures subreddit PPV. The literature-leaning region L1 fails by a factor similar to
+C1's region B (1.49 against 1.354). **Projected:** bipolar inadmissible at the C0
+operating point, depression and eating disorder admissible, schizophrenia open.
+
+What can still move it, for the supervisor meeting: a structured elicitation of label
+PPVs (a direction change from D-028, open item 14); a descriptive audit of carer and
+"am I bipolar" posts and of author cross-posting; the α and calibration share (the 0.43
+clinic figure is admissible only near α = 0.20 with a 20% share); or reporting
+per-condition admissibility as the C2 result under D-032.
+
 D-031 interacts directly: not pruning keeps deterministic containment and α_V = 0, but
 it also keeps the region wide, and width is exactly what the budget constrains. That
 trade is no longer abstract and should be settled with the supervisor with these
-numbers in hand.
+numbers in hand. **D-047 adds one fact:** pruning cannot rescue bipolar, because the
+budget is exhausted near 1% depression → bipolar and the simplex ceiling sits near 4.7%,
+so D-031 can be decided on its other merits.
 
 ### Step 4 — Synthetic generator with a known `T`
 
@@ -360,11 +394,12 @@ and the degradation curves.
   any branch, but they belong in the entry.
 - **D-031 is still OPEN** (prune or do not prune the elicited set). Needs a decision
   before Chapter 4, ideally with the supervisor. It does not block the POC.
-- **Open item 6, elicitation sources, is the long pole after the POC.** The three
-  directional claims (bipolar → depression dominates, schizophrenia's diagonal is
-  lower, depression's is highest) are currently stated from general knowledge and each
-  needs a citation to a specific study. Where the literature is thin the range goes
-  wide, and the envelope propagates that width honestly.
+- **Open item 6, elicitation sources, re-scoped by D-047.** The three directional
+  claims (bipolar → depression dominates, schizophrenia's diagonal is lower,
+  depression's is highest) turn out to constrain entries the budget barely sees; they
+  remain useful for setting wide ranges there. The binding quantity is the worst-case
+  PPV of each rare label, for which no subreddit-level study exists. Open item 13 lists
+  the PDFs still to read; open item 14 is the direction decision.
 - **4 of 6 POC conditions have data.** `anxiety` and `suicidality` are absent; the
   split code warns rather than fails. No code change needed to add them.
 - **Class imbalance ~24:1** is why macro-F1 is the headline metric, and it is also why
@@ -400,6 +435,9 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-08** — Step 3b scoped (D-047): binding quantity identified as rare-label
+  PPV; `src/conformal/elicited_region.py` and `Docs/c2-elicitation-scoping.md` added;
+  §0, §2, §3, §5 and §6 updated.
 - **2026-10-01** — Housekeeping: Step 7 pre-registration renumbered D-042 → D-043 (the
   number D-042 reserved), Step 10 write-up → D-046; stale "commit D-041" open item
   removed.
