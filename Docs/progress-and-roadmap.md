@@ -1,6 +1,6 @@
 # Project Progress & Roadmap — resume-from-here reference
 
-_Last updated: 2026-09-27. This is the single "where are we / what's next" document.
+_Last updated: 2026-10-01. This is the single "where are we / what's next" document.
 Read §0, then jump to §5 "Next action when you resume."_
 
 _Authority note: `Docs/DECISIONS.md` is the authoritative record for every claim and
