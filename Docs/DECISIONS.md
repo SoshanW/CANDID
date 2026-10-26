@@ -103,6 +103,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
 | D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
 | D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
+| D-048 | Prediction function for all three arms: Sesia's plain threshold, equation (3) | ACTIVE | C2 |
 ---
 
 # Part 1 · Scope and framing
@@ -1836,6 +1837,34 @@ escaped.
 
 **Links.** Consumes D-042. Re-scopes open item 6. Bears on D-028, D-031, D-032 and D-043.
 Applies D-019 and D-033.
+
+---
+
+## D-048 · Prediction function for all three arms: Sesia's plain threshold, equation (3)
+**Date:** 2026-10-26 · **Status:** ACTIVE · **Category:** C2
+
+**Decision.** Every arm of D-032 uses the prediction function of Sesia et al.'s equation (3), `C(x, τ) = {k : π̂(x, k) ≥ 1 − τ_k}`, with non-conformity score `ŝ(x, k) = 1 − π̂(x, k)` (equation (2)), deterministic, with empty sets allowed and reported.
+
+**Context.** Roadmap step 5 and `c2-interface.md` §8 require the prediction function to be fixed before the arms are compared, because set sizes depend on it. Sesia, Wang and Tong (2025) state their results for any C satisfying Definition 1. Equation (3) is their worked example and the one named on the input line of Algorithms 1 and 2 ("Prediction function C satisfying Definition 1; e.g. (3)"). Their §4.1 simulations instead use the generalised inverse quantile scores of Romano, Sesia et al. (2020), and so does their public implementation: `cln/classification.py` in github.com/msesia/conformal-label-noise (Python, MIT licence, last pushed 2024-06-19) computes every score through `arc.classification.ProbabilityAccumulator`, randomised by one uniform draw per point (`random_noise`, passed to both `calibrate_scores` and `predict_sets`).
+
+**Reasoning.**
+
+1. **It makes the C2 object a per-condition threshold.** Under Mondrian calibration (D-029) and equation (3), condition k is flagged exactly when `π̂(x, k) ≥ 1 − τ̂_k`: one cut per condition on that condition's own probability. That is the "per-condition abstention threshold" of roadmap §7 in its plainest form, and it can be stated to a clinician in one sentence. For the generalised inverse quantile score, whether k enters is believed to depend on how k ranks against the other classes' probabilities. **That characterisation is unverified:** Romano, Sesia et al. (2020) and Sesia et al.'s Supplementary Section S1, which reviews the score, have not been read (D-033).
+2. **It is deterministic.** Equation (3) involves no random draw, so the same post always receives the same set, a property a screening instrument should have. This is a property of equation (3), not a finding about the alternative: the reference implementation happens to randomise its scores, but whether a non-randomised variant of the generalised inverse quantile score exists is a question about Romano, Sesia et al. (2020), which is unread.
+3. **It can be ported and checked line by line.** `src/conformal/` is numpy-only. `cln` imports `arc` (vendored under `third_party/`) and `statsmodels`, and its README lists torch. With equation (3) the score is one line, so Algorithms 1 and 2 can be ported from equations (12) to (22) and compared term by term against `cln`'s `compute_Delta_hat`, `compute_Delta_hat_bounded`, `compute_delta_const` and `compute_delta_const_bounded`, without taking the dependency.
+4. **It leaves D-042 and D-047 untouched.** The degeneracy criterion uses only `F̂^k_k(S_(n_k)) = 1` and the Definition 1 rule that `τ_k = 1` puts k in every set. Both hold for any valid score, so no number in either entry moves.
+
+**What it costs.**
+
+- **Set sizes are not comparable with Sesia et al.'s Figures 1 and 2**, which use the other score. The POC compares arms with each other, not with the paper, so this is a reporting caveat, not a validity one.
+- **Empty sets can occur.** Under equation (3), a post whose probabilities clear no condition's threshold receives the empty set. Definition 1 does not forbid it. An empty set counts as non-coverage, and the empty-set rate is reported per arm, because in screening it reads as "none of the four conditions", which the closed-world caveat (D-047) already marks as a case the model cannot represent.
+- **If the other score gives materially smaller sets, every arm's sizes are larger than they need be.** Whether it does on this problem is unknown and the claim about its adaptivity is unverified. The arms take the score matrix as input, so a second-score robustness arm can be added later without touching the Algorithm 2 code.
+
+**Evidence.** Sesia et al. (2025), §2 equations (2) to (5), Definition 1, the Algorithm 1 and 2 boxes, and §4.1, read in the local copy on 2026-10-26. `cln/classification.py` read in full on the same date. Romano, Sesia et al. (2020) not read; the reasoning does not depend on any claim about it beyond the fact, visible in Sesia et al.'s §4.1 and in `cln`, that it is the score they used.
+
+**Consequences.** Arm (a) calibrates by equation (4): `τ̂_k` is the ⌈(1 + n_k)(1 − α)⌉-th smallest of `1 − π̂(X_i, k)` over calibration points with `Ỹ_i = k`, and equals one when that rank exceeds n_k. Arms (b) and (c) apply Algorithm 2 with the same scores. Reported per arm and per condition: coverage against the clean label, mean set size, empty-set rate and full-set rate.
+
+**Links.** Implements roadmap step 5's open choice. Depends on D-029 and D-032. Neutral for D-042 and D-047. Precedes D-043.
 
 ---
 
