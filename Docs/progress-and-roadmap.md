@@ -309,11 +309,16 @@ holds by construction. Seeded; `python -m src.conformal.synthetic` prints a summ
 recovered clean prior `ρ = (Tᵀ)⁻¹ρ̃` lands within four standard errors of the truth for
 three matrices at n = 10⁶, and across 200 seeds its z-scores have mean ≈ 0 and SD ≈ 1.
 Recorded as a numerical check on D-028 (amendment) bearing on open item 3, which stays
-open. The arm-side half of the sanity gate (arms coincide at `T = I`) needs steps 5
-and 6.
+open. The arm-side half of the sanity gate needs steps 5 and 6.
 
-**Sanity gate:** with `T = I`, all three arms must coincide. That identity check is the
-POC's own unit test — if it fails, nothing downstream means anything.
+**Sanity gate (corrected 2026-10-26, D-049).** The original text read "with `T = I`, all
+three arms must coincide". That is false for the conservative Algorithm 2: with V = I
+the noise terms vanish but δ keeps the constant c(n_k), so its threshold sits above
+standard conformal's (bipolar at n = 481: rank 447 against 434). The gate is now two
+tests at `T = I`: the optimistic variant (equations (18) and (25)) equals arm (a)
+exactly, and the conservative variant differs from arm (a) by exactly the c(n_k) shift,
+rank ⌈n_k(1 − α + c(n_k))⌉ against ⌈(n_k + 1)(1 − α)⌉. Either failing still means
+nothing downstream can be trusted.
 
 ### Step 5 — Arm (a), noise-blind conformal
 

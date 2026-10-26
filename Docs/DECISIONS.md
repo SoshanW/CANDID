@@ -104,6 +104,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
 | D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
 | D-048 | Prediction function for all three arms: Sesia's plain threshold, equation (3) | ACTIVE | C2 |
+| D-049 | Arm of record: the conservative Algorithm 2, with the optimistic variant reported alongside | ACTIVE | C2 |
 ---
 
 # Part 1 · Scope and framing
@@ -1717,6 +1718,15 @@ falsifiable prediction, and D-043 should record it as one before the run.
 reading the equations. Consumes D-037, D-039 and D-041. Re-plans D-032's sweep.
 Applies D-033. Pre-registration for the simulation deferred to D-043.
 
+**Amendment (2026-10-26, D-049): the degeneracy frontier applies to the conservative
+variant only.** Every δ_ci, budget and verdict in this entry is computed for Algorithm 2
+with the set Î_ci_k of equation (22). Sesia et al.'s optimistic variant replaces it with
+equation (25), whose `max{Δ̂_ci_k − δ_ci, −(1 − α)/n_k}` caps the threshold at standard
+conformal's; at α = 0.10 its set Î_ci_k always contains i = n_k once n_k ≥ 9, so it never
+sets τ̂_k = 1 on this criterion. Its coverage then rests on Proposition 3's condition, not
+on Theorem 4. The numbers here are unchanged; their scope is narrowed to the variant
+D-049 makes the arm of record.
+
 ---
 
 ## D-044 · Pretraining-corpus overlap between MentalBERT and the label-generating subreddits
@@ -1838,6 +1848,13 @@ escaped.
 **Links.** Consumes D-042. Re-scopes open item 6. Bears on D-028, D-031, D-032 and D-043.
 Applies D-019 and D-033.
 
+**Amendment (2026-10-26, D-049): the frontier applies to the conservative variant
+only.** The budget, the PPV floor of about 0.78 and every region verdict above inherit
+D-042's δ_ci, which is that of Algorithm 2 with equation (22). Under the optimistic
+variant, equation (25), no condition degenerates on this criterion, and the question
+becomes whether Proposition 3's condition holds, which needs the true V. The numbers are
+unchanged; their scope is the arm of record set by D-049.
+
 ---
 
 ## D-048 · Prediction function for all three arms: Sesia's plain threshold, equation (3)
@@ -1865,6 +1882,38 @@ Applies D-019 and D-033.
 **Consequences.** Arm (a) calibrates by equation (4): `τ̂_k` is the ⌈(1 + n_k)(1 − α)⌉-th smallest of `1 − π̂(X_i, k)` over calibration points with `Ỹ_i = k`, and equals one when that rank exceeds n_k. Arms (b) and (c) apply Algorithm 2 with the same scores. Reported per arm and per condition: coverage against the clean label, mean set size, empty-set rate and full-set rate.
 
 **Links.** Implements roadmap step 5's open choice. Depends on D-029 and D-032. Neutral for D-042 and D-047. Precedes D-043.
+
+---
+
+## D-049 · Arm of record: the conservative Algorithm 2, with the optimistic variant reported alongside
+**Date:** 2026-10-26 · **Status:** ACTIVE · **Category:** C2
+
+**Decision.** Arms (b) and (c) report the conservative Algorithm 2 of Sesia et al. (set Î_ci_k of equation (22), guarantee by Theorem 4) as the arm of record. The optimistic variant (equation (18) for Algorithm 1, equation (25) for Algorithm 2; their "Adaptive+", guarantee by Propositions 2 and 3) is reported alongside it in every table. The roadmap's step 4 sanity gate is corrected to two tests.
+
+**Context.** Reading equations (14) to (25) to fix D-048 showed two things the roadmap and D-042 had not separated. First, the optimistic set `{i : i/n_k ≥ 1 − α − max{Δ̂_ci_k(S_(i)) − δ_ci, −(1 − α)/n_k}}` always contains i = n_k once n_k ≥ (1 − α)/α (9 at α = 0.10), so it never sets τ̂_k = 1, and its threshold is never above standard conformal's. D-042's degeneracy frontier is therefore a property of the conservative variant only. Second, with T = I the noise terms vanish but δ keeps c(n_k), so the conservative variant does not coincide with standard conformal.
+
+**Reasoning.** Proposition 3's condition, `inf_t Δ_k(t) ≥ δ_ci(n_k, n*) − (1 − α)/n_k`, involves the true coverage inflation factor `Δ_k(t) = F^k_k(t) − F̃^k_k(t)` (equation (7)), which needs the true V and the clean-label score distributions. C1 established that V is not recoverable from this data (D-041). On real data, therefore, only the conservative variant has a guarantee that the elicited region can support: Theorem 4 needs only that the region contain V with probability 1 − α_V, which D-031's deterministic containment supplies with α_V = 0. The optimistic variant is still reported, because Sesia et al. find it "preferable in practice" (§4.1) and because the synthetic harness, where V is known, can measure what the unverifiable condition costs.
+
+**What the condition says, read from the proof.** As stated, the infimum is over all t ∈ ℝ. Both CDFs in Δ_k vanish below the range of the scores, so `inf_t Δ_k(t) ≤ 0`, and the condition can hold only if `δ_ci ≤ (1 − α)/n_k`. Since `δ_ci ≥ c(n_k)`, which is 0.0283 against (1 − α)/n_k = 0.0019 at bipolar's n_k = 481, the condition as written holds at no calibration count in this project. The proof of Proposition 2 (arXiv:2309.05092 v2, Supplement §A7; Proposition 3's proof builds on it) uses the hypothesis only through `|max{Δ̂_k(t) − δ + (1 − α)/n_k, 0} − (Δ_k(t) − δ + (1 − α)/n_k)| ≤ |Δ̂_k(t) − Δ_k(t)|` evaluated at the realised threshold `t = S^k_(î_k)`. The harness therefore checks both: the condition as stated, and the at-threshold form the proof uses. The second is this project's reading of the proof, not a statement Sesia et al. make. The JRSSB supplement was not checked, and its numbering may differ from the arXiv version.
+
+**Gate correction.** Roadmap step 4 read "with T = I, all three arms must coincide". At T = I the conservative variant uses rank ⌈n_k(1 − α + c(n_k))⌉ against standard conformal's ⌈(n_k + 1)(1 − α)⌉:
+
+| condition | n_k (C0 test split) | c(n_k) | standard rank | conservative rank |
+|---|---|---|---|---|
+| bipolar | 481 | 0.0283 | 434 | 447 |
+| schizophrenia | 786 | 0.0222 | 709 | 725 |
+| eating disorder | 1,421 | 0.0165 | 1,280 | 1,303 |
+| depression | 11,351 | 0.0059 | 10,217 | 10,283 |
+
+The gate is now two tests at T = I: the optimistic variant equals arm (a) exactly, and the conservative variant differs from it by exactly this shift. The original text was an internal inconsistency with D-042's own δ_ci, which contains c(n_k), not a misread source, so it is not counted on the reversal scoreboard.
+
+**Arm (b) needs no new definition.** With a zero-width box (V̂_low = V̂_upp = V̂, α_V = 0), δ̂^(V)_k* = 0, and ζ̂^upp_k = 0 because the box asserts V = V̂. Equation (20) then reduces to equation (13) with V̂, and equation (21) to equation (17). Algorithm 2 with a point estimate is Algorithm 1 with V̂, the plug-in that Sesia et al.'s §3.3 describes, so D-032's wording and the roadmap agree.
+
+**Evidence.** Sesia et al. (2025), equations (7), (13) to (22) and (25), Propositions 2 and 3, read in the local copy on 2026-10-26; proof of Proposition 2 in arXiv:2309.05092 v2, Supplement §A7, read the same day. c(n_k) from `v_region.expected_sup_deviation`. The reference implementation (`cln/classification.py`) codes the optimistic set as `max(−(1−α)/n_k, Δ̂ − δ)`, matching equation (18).
+
+**Consequences.** Every arm table carries a conservative and an optimistic line. D-042 and D-047 carry dated amendments narrowing their frontier to the conservative variant; their numbers do not change. On the synthetic harness, step 6 records, per condition and run, whether Proposition 3's condition holds in both forms and whether the optimistic variant under-covers. **D-043 must pre-register a prediction for this**; none is made here.
+
+**Links.** Depends on D-031, D-041, D-042 and D-048. Amends D-042 and D-047. Corrects roadmap step 4. Precedes D-043.
 
 ---
 
