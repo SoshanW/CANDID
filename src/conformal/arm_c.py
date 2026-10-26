@@ -349,6 +349,7 @@ def head_to_head(truth, point, draws):
         cals = calibrations(draws, low, upp, "conservative", None)
         taus = np.array([c.tau for c in cals])
         out[label] = (run_arm(label, _replay(taus), draws), (taus >= 1.0).sum(axis=0))
+    arm_a = run_arm("a", lambda s, y: standard_thresholds(s, y, ALPHA), draws)
     verdicts = {}
     for k in (0, 3):
         b, b_deg = out["b"]
@@ -369,6 +370,10 @@ def head_to_head(truth, point, draws):
             "b_size": float(b.mean_size[k]), "b_degenerate_runs": int(b_deg[k]),
             "c_coverage": float(c.coverage[k]), "c_se": float(c.coverage_se[k]),
             "c_size": float(c.mean_size[k]), "c_degenerate_runs": int(c_deg[k]),
+            "b_full": float(b.full_rate[k]), "c_full": float(c.full_rate[k]),
+            "a_coverage": float(arm_a.coverage[k]), "a_se": float(arm_a.coverage_se[k]),
+            "a_size": float(arm_a.mean_size[k]), "a_full": float(arm_a.full_rate[k]),
+            "a_valid": bool(arm_a.coverage[k] >= 0.90 - 3 * arm_a.coverage_se[k]),
         }
     return verdicts
 
@@ -537,8 +542,10 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - reporting
     print("\n=== §4(c) head-to-head (region A width) ===")
     for o, rows in run["h2h"].items():
         for k, row in rows.items():
-            print(f"{o} {SHORT[k]:14} {row['verdict']:18} b cov {row['b_coverage']:.4f}±{row['b_se']:.4f} size {row['b_size']:.3f}"
-                  f" | c cov {row['c_coverage']:.4f}±{row['c_se']:.4f} size {row['c_size']:.3f} deg {row['c_degenerate_runs']}")
+            print(f"{o} {SHORT[k]:14} {row['verdict']:18}"
+                  f" a cov {row['a_coverage']:.4f}±{row['a_se']:.4f} size {row['a_size']:.3f} full {row['a_full']:.3f}"
+                  f" | b cov {row['b_coverage']:.4f}±{row['b_se']:.4f} size {row['b_size']:.3f} full {row['b_full']:.3f}"
+                  f" | c cov {row['c_coverage']:.4f}±{row['c_se']:.4f} size {row['c_size']:.3f} full {row['c_full']:.3f} deg {row['c_degenerate_runs']}")
     print(f"head-to-head WON: {run['h2h_won']}")
 
     if run["flips"]:

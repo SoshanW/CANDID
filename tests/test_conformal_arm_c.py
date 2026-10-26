@@ -136,3 +136,25 @@ def test_assumptions_are_pinned(run):
 
 def test_contradiction_count_is_pinned(run):
     assert len(run["contradictions"]) == 52
+
+
+H2H_ARM_A = {  # (coverage, mean size, full-set rate) on each orientation's own draws
+    "O1": {0: (0.9556, 1.328, 0.000), 3: (0.9195, 1.369, 0.000)},
+    "O2": {0: (0.9976, 1.671, 0.004), 3: (0.9865, 1.877, 0.007)},
+}
+
+
+def test_head_to_head_reports_arm_a_alongside_and_it_is_valid(run):
+    for o, rows in H2H_ARM_A.items():
+        for k, (cov, size, full) in rows.items():
+            got = run["h2h"][o][k]
+            assert got["a_coverage"] == pytest.approx(cov, abs=6e-5)
+            assert got["a_size"] == pytest.approx(size, abs=6e-4)
+            assert got["a_full"] == pytest.approx(full, abs=6e-4)
+            assert got["a_valid"]
+
+
+def test_arm_a_is_valid_in_every_region_cell(run):
+    for name in REGION_NAMES:
+        arm = run["results"][(name, "zeta_star")].arms["arm (a)"]
+        assert (arm.coverage >= 0.90 - 3 * arm.coverage_se).all(), name
