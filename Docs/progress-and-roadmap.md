@@ -49,8 +49,12 @@ DECISIONS.md wins._
 Multi-condition mental-health screening from text, studying **proxy-label noise**
 (Reddit "subreddit = diagnosis" is a noisy label) and **calibrated abstention** (the
 model should refuse to answer when unsure), evaluated under a **Reddit → clinical
-distribution shift**. Downstream model: **MentalBERT**. Full technical framing lives
-in `Docs/technical-contribution-in-depth.md`.
+distribution shift**. Downstream model: **MentalBERT**. The technical framing is
+split by contribution: C1 in `Docs/contribution-1.md` (why C1 became a diagnostic,
+D-030) and `Docs/c1-noise-design.md` (the pre-D-030 estimator design); C2 in
+`Docs/c2-interface.md` and `Docs/c2-elicitation-scoping.md`; C3 and the evaluation
+design in D-032 and §7 below. (`technical-contribution-in-depth.md` was removed in
+94c031d.)
 
 Three datasets:
 - **Low et al.** (Reddit, Zenodo 3941387) — per-post, subreddit = proxy label.
