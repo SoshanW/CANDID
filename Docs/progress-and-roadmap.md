@@ -42,10 +42,19 @@ DECISIONS.md wins._
   (outflow from bipolar only) the wrong point estimate did **not** break coverage, as
   expected before the run and against the roadmap's original expectation, and the
   optimistic variant reduced exactly to arm (a).
-- **Immediately next:** take D-047, D-049 and step 6 to the supervisor with open items 3,
-  5 and 14. Then §5 step 7: D-043 pre-registers D-047's per-condition predictions, the
-  Proposition 3 diagnostic (D-049), and a configuration with inflow into a rare label,
-  the case step 6 shows the argument for a region needs.
+- **§5 steps 7 and 8 are DONE (2026-10-26).** D-043 was committed before the run, and
+  D-046 records the result.
+  - **Held:** every closed-form guarantee, with no implementation error. The
+    head-to-head was **not won**, as predicted.
+  - **Failed:** the judged predictions mostly. Arm (c) avoided "always flag" more often
+    than predicted, but its sets were larger than noise-blind arm (a)'s in every cell
+    (about 3.6 of 4 conditions in F1 and F2).
+  - **Not measured:** informativeness. D-043 did not pre-register it, so it is not
+    established.
+- **Immediately next:** review and commit D-046, then D-050, which pre-registers the
+  informativeness criterion, the width and heterogeneity sweeps (step 9), and a
+  separability pinned to C0's per-condition F1. Take D-046 to the supervisor with open
+  items 3, 5 and 14.
 
 ---
 
@@ -443,7 +452,7 @@ pre-register in D-043. Points 3 and 4 also bear on D-032's head-to-head: at thes
 calibration counts, arm (b) or (c) must recover more than c(n_k) before the
 conservative variant can beat arm (a) on set size.
 
-### Step 7 — PRE-REGISTER before arm (c) runs
+### Step 7 — PRE-REGISTER before arm (c) runs. ✅ DONE 2026-10-26 (D-043, cf12627)
 
 Write **D-043** in DECISIONS.md fixing branches and thresholds *before the numbers
 exist*. (D-043 is the number D-042 reserved for this pre-registration; D-044 and D-045
@@ -465,12 +474,27 @@ should pre-register the quantities the closed form cannot give:
 That last row matters: it turns Step 3 into a falsifiable prediction rather than a
 derivation nobody tested.
 
-### Step 8 — Arm (c), region input at the real width
+### Step 8 — Arm (c), region input at the real width. ✅ DONE 2026-10-26 (D-046)
 
 Feed the region A and region B boxes from `c2-interface.md` §6. Measure per-class
 coverage, mean set size, and the full-set rate. Fire the D-043 branches.
 
-### Step 9 — The sweep, now a check on Step 3
+**Result.** `src/conformal/arm_c.py` (5c17e6b, 0758618) ran all seven regions under
+D-043.
+
+- **Closed-form guarantees: all held.** That covers the five certain cells and 28 of 28
+  flip brackets.
+- **Secondary admissibility calls: 3 held, 15 falsified, 5 split.**
+- **D-042 / D-047 "ok" verdicts: 17 confirmed, 5 split, 0 overturned.**
+- **Head-to-head: not won.**
+- **Arm (a) against arm (c).** Arm (a) was valid in every cell, with mean set size 1.33 to
+  1.88. Arm (c) was also valid, but with mean set size 2.79 to 3.98 and full-set rate 0.11
+  to 0.98.
+
+Informativeness was not pre-registered, so D-043's "C2 proceeds as D-047 scoped it" is
+not established. D-050 fixes the criterion.
+
+### Step 9 — The sweep, now a check on Step 3. ◐ α SWEEP DONE (D-046 §3); width and heterogeneity sweeps wait for D-050
 
 Sweep region width from 0 (a point estimate) upward and compare the measured
 degeneracy point against the closed-form frontier from Step 3. Run D-032's
@@ -480,7 +504,7 @@ noise-heterogeneity sweep on the same harness.
 width w*, and this project's proxy noise sits above it" is a publishable finding even
 if arm (c) loses, and Step 1 has already located w* to within a transcription.
 
-### Step 10 — Write the result up as D-046
+### Step 10 — Write the result up as D-046. ◐ DRAFTED 2026-10-26, awaiting review
 
 Branch fired, predictions held or missed, and the consequence for C2's scope. Update
 the reversal scoreboard either way.
@@ -555,6 +579,9 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-26** — Steps 7 and 8 done. D-043 committed (cf12627); arm (c) run and
+  scored (5c17e6b, 0758618); D-046 drafted with the D-043 gap note and the scoreboard
+  update. Width and heterogeneity sweeps deferred to D-050.
 - **2026-10-26** — Step 6 done: Algorithm 2 ported, both variants; gates pass. Wrong
   point did not break coverage (expected before the run, contrary to the original
   roadmap text); optimistic variant reduced exactly to arm (a); Proposition 3 failed

@@ -103,6 +103,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-043 | Pre-registration for arm (c): closed-form brackets, judged predictions, and the head-to-head | OPEN (pre-registration, awaiting review and commit) | C2 |
 | D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
 | D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
+| D-046 | Arm (c) result: the certain predictions hold, the judged ones mostly fail, and informativeness was not measured | ACTIVE | C2 |
 | D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
 | D-048 | Prediction function for all three arms: Sesia's plain threshold, equation (3) | ACTIVE | C2 |
 | D-049 | Arm of record: the conservative Algorithm 2, with the optimistic variant reported alongside | ACTIVE | C2 |
@@ -2137,6 +2138,241 @@ None of these can be rescued afterwards by moving the grid.
 
 Tests D-042 and D-047. Implements roadmap step 7. Depends on D-028, D-029, D-031, D-032, D-048 and D-049. Results to D-046.
 
+**Amendment (2026-10-26, D-046): a gap. No informativeness criterion was pre-registered.** This entry defines a cell as admissible when τ̂_k < 1, and §6's second bullet draws the consequence "C2 proceeds as D-047 scoped it" from admissibility alone. The run (D-046) shows conservative sets that are admissible by this definition yet nearly full: a mean size of 3.60 to 3.80 of 4 in F1 and F2, against 1.42 to 1.45 for arm (a) on the same data. Admissibility did not measure whether the sets are informative, so that consequence is not established. The criterion is pre-registered in D-050 before any further arm (c) run. No prediction, threshold or rule in this entry changes.
+
+---
+
+## D-046 · Arm (c) result: the certain predictions hold, the judged ones mostly fail, and informativeness was not measured
+**Date:** 2026-10-26 · **Status:** ACTIVE · **Category:** C2
+
+**Decision.** Roadmap step 8 ran D-043 (commit cf12627) as written. **Every certain prediction held**: the five certain cells and all 28 flip brackets, so there is no implementation error. **The judged (secondary) admissibility calls mostly failed**: 3 held, 15 falsified, 5 split. D-042 and D-047's "ok" verdicts were confirmed in 17 cells, split in 5 and overturned in none. The region A head-to-head was **not won**, as predicted. Arm (c)'s conservative sets were **larger than arm (a)'s in every cell**. D-043 did not pre-register a measure of informativeness, so whether arm (c) is useful is **not established** by this run.
+
+**Context.**
+
+- **Code.** `src/conformal/arm_c.py`, commits 5c17e6b and 0758618. `python -m src.conformal.arm_c` reproduces every number below in about a minute, and `tests/test_conformal_arm_c.py` pins them.
+- **Run specification.** D-043 §1: 100 repetitions, base seed 0, calibration counts 481 / 11,351 / 1,421 / 786, 20,000 test points, separability 2.0, and reference samples of 2 × 10⁶ at seed 10⁶.
+- **Two implementation details, neither touching a D-043 rule:**
+  - `poc.draw_calibration_and_test` gained a `clean_prior` argument, so that each region's truth uses its recovered prior (D-043 §1). The step 5 and step 6 pins are unchanged.
+  - The transcribed C1 truths are row-renormalised exactly as `transition_to_v` already does. `T_CLEANLAB`'s rows sum to one only to within 10⁻⁴, and the generator rejects that.
+- **Contradictions.** The run lists 52 results that contradict D-043. Every one is in the secondary tier, §4(a), Proposition 3 at the threshold, or the O1 schizophrenia head-to-head call. None is in the primary tier.
+
+### 1. Admissibility at α = 0.10 (conservative variant)
+
+**Primary tier: held in full.** The certain cells came out as required, with no exception:
+
+- region B bipolar, B schizophrenia, L1 bipolar and R0 bipolar were degenerate in 100 of 100 runs;
+- region A depression was admissible in 100 of 100;
+- under ζ̂ = 0, region B depression was also admissible in 100 of 100.
+
+| region | condition | degenerate runs /100, ζ̂ = δ̂* | outcome | D-043 secondary call | secondary score | D-042 / D-047 | degenerate runs /100, ζ̂ = 0 |
+|---|---|---|---|---|---|---|---|
+| A | bipolar | 77 | split | degenerate | split | split | 62 |
+| A | depression | 0 | admissible | certain-ok | held (certain) | confirmed | 0 |
+| A | eating disorder | 1 | admissible | degenerate | falsified | confirmed | 0 |
+| A | schizophrenia | 32 | split | degenerate | split | split | 7 |
+| B | bipolar | 100 | degenerate | certain-degenerate | held (certain) | (not ok) | 100 |
+| B | depression | 0 | admissible | admissible | held | confirmed | 0 |
+| B | eating disorder | 50 | split | degenerate | split | split | 17 |
+| B | schizophrenia | 100 | degenerate | certain-degenerate | held (certain) | (not ok) | 100 |
+| F1 | bipolar | 28 | split | degenerate | split | split | 4 |
+| F1 | depression | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F1 | eating disorder | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F1 | schizophrenia | 4 | admissible | degenerate | falsified | confirmed | 0 |
+| F2 | bipolar | 20 | split | degenerate | split | split | 2 |
+| F2 | depression | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F2 | eating disorder | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F2 | schizophrenia | 6 | admissible | degenerate | falsified | confirmed | 0 |
+| F3 | bipolar | 100 | degenerate | degenerate | held | (not ok) | 100 |
+| F3 | depression | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F3 | eating disorder | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| F3 | schizophrenia | 5 | admissible | degenerate | falsified | confirmed | 0 |
+| L1 | bipolar | 100 | degenerate | certain-degenerate | held (certain) | (not ok) | 100 |
+| L1 | depression | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| L1 | eating disorder | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| L1 | schizophrenia | 6 | admissible | degenerate | falsified | confirmed | 0 |
+| R0 | bipolar | 100 | degenerate | certain-degenerate | held (certain) | (not ok) | 100 |
+| R0 | depression | 0 | admissible | degenerate | falsified | confirmed | 0 |
+| R0 | eating disorder | 6 | admissible | degenerate | falsified | confirmed | 0 |
+| R0 | schizophrenia | 100 | degenerate | degenerate | held | (not ok) | 100 |
+
+**Tallies over the 23 undetermined cells (secondary tier):** 3 held (B depression, F3 bipolar, R0 schizophrenia), 15 falsified, 5 split. Every falsification was the same way round: predicted degenerate, observed admissible. **D-042 / D-047's 22 "ok" cells:** 17 confirmed, 5 split (A bipolar, A schizophrenia, B eating disorder, F1 bipolar, F2 bipolar), 0 overturned. Region A bipolar, D-042's "survives by 0.008", was degenerate in 77 of 100 runs.
+
+### 2. Every cell, with arm (a) alongside
+
+Clean-label coverage (mean ± SE over 100 runs), validity under D-043's rule (coverage ≥ 0.90 − 3 SE), mean set size over truly-k test points, and full-set rate. All are raw, with no pass or fail attached to size or full-set rate. The optimistic variant's thresholds equal arm (a)'s on every run in every region (pinned), so its columns would repeat arm (a)'s.
+
+| region | condition | arm (a) coverage | arm (a) valid | arm (a) size | arm (a) full | arm (c) coverage | arm (c) valid | arm (c) size | arm (c) full |
+|---|---|---|---|---|---|---|---|---|---|
+| A | bipolar | 0.9556 ± 0.0015 | yes | 1.328 | 0.000 | 1.0000 ± 0.0000 | yes | 2.789 | 0.106 |
+| A | depression | 0.9018 ± 0.0003 | yes | 1.374 | 0.000 | 0.9283 ± 0.0003 | yes | 3.567 | 0.594 |
+| A | eating disorder | 0.9039 ± 0.0010 | yes | 1.373 | 0.000 | 0.9983 ± 0.0001 | yes | 3.122 | 0.148 |
+| A | schizophrenia | 0.9195 ± 0.0014 | yes | 1.369 | 0.000 | 1.0000 ± 0.0000 | yes | 2.820 | 0.109 |
+| B | bipolar | 0.9556 ± 0.0015 | yes | 1.328 | 0.000 | 1.0000 ± 0.0000 | yes | 3.312 | 0.339 |
+| B | depression | 0.9018 ± 0.0003 | yes | 1.374 | 0.000 | 0.9828 ± 0.0001 | yes | 3.950 | 0.950 |
+| B | eating disorder | 0.9039 ± 0.0010 | yes | 1.373 | 0.000 | 1.0000 ± 0.0000 | yes | 3.344 | 0.344 |
+| B | schizophrenia | 0.9195 ± 0.0014 | yes | 1.369 | 0.000 | 1.0000 ± 0.0000 | yes | 3.313 | 0.339 |
+| F1 | bipolar | 0.9467 ± 0.0015 | yes | 1.428 | 0.000 | 1.0000 ± 0.0000 | yes | 3.597 | 0.682 |
+| F1 | depression | 0.9433 ± 0.0003 | yes | 1.434 | 0.000 | 0.9999 ± 0.0000 | yes | 3.678 | 0.723 |
+| F1 | eating disorder | 0.9184 ± 0.0009 | yes | 1.452 | 0.000 | 0.9995 ± 0.0000 | yes | 3.804 | 0.832 |
+| F1 | schizophrenia | 0.9345 ± 0.0012 | yes | 1.442 | 0.000 | 1.0000 ± 0.0000 | yes | 3.652 | 0.709 |
+| F2 | bipolar | 0.9460 ± 0.0015 | yes | 1.419 | 0.000 | 1.0000 ± 0.0000 | yes | 3.597 | 0.683 |
+| F2 | depression | 0.9392 ± 0.0003 | yes | 1.429 | 0.000 | 0.9999 ± 0.0000 | yes | 3.684 | 0.731 |
+| F2 | eating disorder | 0.9185 ± 0.0009 | yes | 1.442 | 0.000 | 0.9995 ± 0.0000 | yes | 3.789 | 0.821 |
+| F2 | schizophrenia | 0.9347 ± 0.0012 | yes | 1.432 | 0.000 | 1.0000 ± 0.0000 | yes | 3.643 | 0.706 |
+| F3 | bipolar | 0.9760 ± 0.0011 | yes | 1.456 | 0.001 | 1.0000 ± 0.0000 | yes | 3.606 | 0.688 |
+| F3 | depression | 0.9429 ± 0.0003 | yes | 1.552 | 0.001 | 0.9999 ± 0.0000 | yes | 3.709 | 0.740 |
+| F3 | eating disorder | 0.9184 ± 0.0009 | yes | 1.570 | 0.001 | 0.9995 ± 0.0000 | yes | 3.825 | 0.844 |
+| F3 | schizophrenia | 0.9345 ± 0.0012 | yes | 1.558 | 0.001 | 1.0000 ± 0.0000 | yes | 3.678 | 0.721 |
+| L1 | bipolar | 0.9977 ± 0.0002 | yes | 1.474 | 0.001 | 1.0000 ± 0.0000 | yes | 3.625 | 0.701 |
+| L1 | depression | 0.9417 ± 0.0003 | yes | 1.860 | 0.005 | 0.9999 ± 0.0000 | yes | 3.732 | 0.759 |
+| L1 | eating disorder | 0.9184 ± 0.0009 | yes | 1.876 | 0.007 | 0.9996 ± 0.0000 | yes | 3.828 | 0.846 |
+| L1 | schizophrenia | 0.9345 ± 0.0012 | yes | 1.866 | 0.005 | 1.0000 ± 0.0000 | yes | 3.687 | 0.730 |
+| R0 | bipolar | 0.9919 ± 0.0004 | yes | 1.544 | 0.002 | 1.0000 ± 0.0000 | yes | 3.924 | 0.929 |
+| R0 | depression | 0.9534 ± 0.0003 | yes | 1.761 | 0.006 | 1.0000 ± 0.0000 | yes | 3.947 | 0.947 |
+| R0 | eating disorder | 0.9169 ± 0.0009 | yes | 1.795 | 0.009 | 1.0000 ± 0.0000 | yes | 3.976 | 0.976 |
+| R0 | schizophrenia | 0.9538 ± 0.0010 | yes | 1.756 | 0.006 | 1.0000 ± 0.0000 | yes | 3.924 | 0.929 |
+
+Arm (b) was defined by D-043 only at region A width, in the head-to-head (§5). No arm (b) point was specified for the other regions, and none was run.
+
+**Arm (a), from the measurements.**
+
+- **It was valid in every cell.** Its lowest coverage was 0.9018 ± 0.0003, for depression in regions A and B, and every other cell sat higher.
+- **Its sets were smaller than arm (c)'s in every cell:** a mean size of 1.33 to 1.88 against arm (c)'s 2.79 to 3.98.
+- **Its full-set rate never exceeded 0.009,** against arm (c)'s 0.106 to 0.976.
+
+This is stated from the table, not from `c2-interface.md` §3's derivation that arm (a) is conservative when Assumption 3 holds.
+
+### 3. Flip α (D-043 §3)
+
+The α grid was {0.02, 0.05, 0.10, 0.15, 0.20, 0.30, 0.50, 0.75, 0.95}. The measured flip α̂ is the smallest grid α at which τ̂_k < 1 in at least 50 runs.
+
+| region | condition | δ_ci | guaranteed bracket | measured α̂ | in bracket | D-042 (α̂ at or below first grid point ≥ δ_ci) | secondary |
+|---|---|---|---|---|---|---|---|
+| A | bipolar | 0.092 | [0.011, 1.326] | 0.15 | yes | failed | failed |
+| A | depression | 0.008 | [0.006, 0.034] | 0.02 | yes | held | held |
+| A | eating disorder | 0.024 | [0.020, 0.226] | 0.05 | yes | held | failed |
+| A | schizophrenia | 0.055 | [0.029, 0.752] | 0.1 | yes | held | failed |
+| B | bipolar | 0.285 | [0.204, 4.185] | 0.5 | yes | failed | failed |
+| B | depression | 0.015 | [0.013, 0.123] | 0.02 | yes | held | failed |
+| B | eating disorder | 0.051 | [0.046, 0.537] | 0.1 | yes | held | failed |
+| B | schizophrenia | 0.152 | [0.126, 1.993] | 0.3 | yes | failed | failed |
+| F1 | bipolar | 0.065 | [0.047, 0.831] | 0.1 | yes | held | failed |
+| F1 | depression | 0.041 | [0.039, 0.607] | 0.05 | yes | held | failed |
+| F1 | eating disorder | 0.028 | [0.024, 0.307] | 0.05 | yes | held | failed |
+| F1 | schizophrenia | 0.046 | [0.035, 0.563] | 0.1 | yes | failed | failed |
+| F2 | bipolar | 0.062 | [0.050, 0.821] | 0.1 | yes | held | failed |
+| F2 | depression | 0.040 | [0.038, 0.549] | 0.05 | yes | held | failed |
+| F2 | eating disorder | 0.029 | [0.023, 0.310] | 0.05 | yes | held | failed |
+| F2 | schizophrenia | 0.047 | [0.035, 0.567] | 0.1 | yes | failed | failed |
+| F3 | bipolar | 0.103 | [0.066, 1.856] | 0.15 | yes | held | failed |
+| F3 | depression | 0.041 | [0.039, 0.607] | 0.05 | yes | held | failed |
+| F3 | eating disorder | 0.028 | [0.024, 0.312] | 0.05 | yes | held | failed |
+| F3 | schizophrenia | 0.046 | [0.035, 0.573] | 0.1 | yes | failed | failed |
+| L1 | bipolar | 0.311 | [0.175, 7.516] | 0.5 | yes | held | failed |
+| L1 | depression | 0.041 | [0.039, 0.607] | 0.05 | yes | held | failed |
+| L1 | eating disorder | 0.029 | [0.023, 0.327] | 0.05 | yes | held | failed |
+| L1 | schizophrenia | 0.048 | [0.034, 0.601] | 0.1 | yes | failed | failed |
+| R0 | bipolar | 0.246 | [0.214, 3.949] | 0.3 | yes | held | failed |
+| R0 | depression | 0.078 | [0.037, 0.954] | 0.1 | yes | held | failed |
+| R0 | eating disorder | 0.051 | [0.019, 0.669] | 0.1 | yes | held | failed |
+| R0 | schizophrenia | 0.152 | [0.064, 2.773] | 0.2 | yes | held | failed |
+
+Every measured flip lies inside its guaranteed bracket (28 of 28). D-042's flip held in 21 cells and failed in 7: A bipolar, B bipolar, B schizophrenia, and F1, F2, F3 and L1 schizophrenia. The secondary flip prediction held in 1 cell (A depression) and failed in 27, in every case because the condition became admissible at a lower α than predicted.
+
+### 4. Assumptions and Proposition 3 (D-043 §4(b), §5)
+
+| region | condition | Prop. 3 as stated: fails /100 | at threshold: fails /100 | optimistic valid | A2 f_min part | A3 sup | A5 RHS | inf Δ | A5 holds |
+|---|---|---|---|---|---|---|---|---|---|
+| A | bipolar | 100 | 100 | yes | fails (0.0052) | +0.0000 | +1.226 | +0.0000 | no |
+| A | depression | 100 | 100 | yes | fails (0.0047) | +0.0000 | -0.066 | -0.0000 | yes |
+| A | eating disorder | 100 | 100 | yes | fails (0.0049) | +0.0000 | +0.126 | -0.0000 | no |
+| A | schizophrenia | 100 | 100 | yes | fails (0.0054) | +0.0000 | +0.652 | +0.0000 | no |
+| B | bipolar | 100 | 100 | yes | fails (0.0052) | +0.0000 | +4.085 | +0.0000 | no |
+| B | depression | 100 | 100 | yes | fails (0.0047) | +0.0000 | +0.023 | -0.0000 | no |
+| B | eating disorder | 100 | 100 | yes | fails (0.0049) | +0.0000 | +0.437 | -0.0000 | no |
+| B | schizophrenia | 100 | 100 | yes | fails (0.0054) | +0.0000 | +1.893 | +0.0000 | no |
+| F1 | bipolar | 100 | 100 | yes | fails (0.0026) | +0.0000 | +0.714 | -0.0000 | no |
+| F1 | depression | 100 | 0 | yes | fails (0.0056) | +0.0000 | +0.506 | +0.0000 | no |
+| F1 | eating disorder | 100 | 100 | yes | fails (0.0060) | +0.0000 | +0.203 | -0.0001 | no |
+| F1 | schizophrenia | 100 | 100 | yes | fails (0.0093) | +0.0000 | +0.452 | -0.0000 | no |
+| F2 | bipolar | 100 | 100 | yes | fails (0.0026) | +0.0000 | +0.709 | -0.0001 | no |
+| F2 | depression | 100 | 100 | yes | fails (0.0058) | +0.0000 | +0.447 | +0.0000 | no |
+| F2 | eating disorder | 100 | 100 | yes | fails (0.0050) | +0.0000 | +0.205 | -0.0000 | no |
+| F2 | schizophrenia | 100 | 100 | yes | fails (0.0074) | +0.0000 | +0.455 | -0.0000 | no |
+| F3 | bipolar | 100 | 100 | yes | fails (0.0027) | +0.0000 | +1.719 | -0.0000 | no |
+| F3 | depression | 100 | 0 | yes | fails (0.0054) | +0.0000 | +0.506 | +0.0000 | no |
+| F3 | eating disorder | 100 | 100 | yes | fails (0.0060) | +0.0000 | +0.208 | -0.0001 | no |
+| F3 | schizophrenia | 100 | 100 | yes | fails (0.0093) | +0.0000 | +0.461 | -0.0000 | no |
+| L1 | bipolar | 100 | 100 | yes | fails (0.0027) | +0.0000 | +7.280 | +0.0000 | no |
+| L1 | depression | 100 | 18 | yes | fails (0.0053) | +0.0000 | +0.506 | +0.0000 | no |
+| L1 | eating disorder | 100 | 100 | yes | fails (0.0060) | +0.0000 | +0.222 | -0.0001 | no |
+| L1 | schizophrenia | 100 | 100 | yes | fails (0.0093) | +0.0000 | +0.488 | -0.0000 | no |
+| R0 | bipolar | 100 | 100 | yes | fails (0.0027) | +0.0000 | +3.818 | -0.0000 | no |
+| R0 | depression | 100 | 100 | yes | fails (0.0056) | +0.0000 | +0.812 | +0.0000 | no |
+| R0 | eating disorder | 100 | 100 | yes | fails (0.0059) | +0.0000 | +0.537 | -0.0000 | no |
+| R0 | schizophrenia | 100 | 100 | yes | fails (0.0094) | +0.0000 | +2.584 | -0.0000 | no |
+
+- **Assumption 2:** the f_min part failed in all 28 cells, as predicted.
+- **Assumption 3:** held in all 28 cells, as predicted. The largest violation was +0.0000.
+- **Assumption 5:** held only for region A depression, as predicted.
+- **Proposition 3 as stated:** failed in 100 of 100 runs in every cell, as predicted.
+- **Proposition 3 at the threshold:** failed in at least 90 runs in 25 cells. The **exceptions** were depression in F1 (0 failures), F3 (0) and L1 (18), where the prediction is falsified.
+- **The optimistic variant was valid in every cell**, as predicted.
+
+### 5. The head-to-head at region A width (D-043 §4(c))
+
+The conservative variant is shown, with arm (a) on the same draws. "Deg" counts the runs in which τ̂_k = 1.
+
+| orientation | condition | arm (a) cov / size / full | arm (b) cov / size / full | arm (c) cov / size / full, deg | verdict | predicted |
+|---|---|---|---|---|---|---|
+| O1 (truth HOC, (b) given cleanlab) | bipolar | 0.9556 / 1.328 / 0.000 | 0.8095 / 1.102 / 0.000 | 1.0000 / 2.789 / 0.106, 77 | WIN BY ABSTENTION | WIN BY ABSTENTION (held) |
+| O1 | schizophrenia | 0.9195 / 1.369 / 0.000 | 0.8424 / 1.121 / 0.000 | 1.0000 / 2.820 / 0.109, 32 | WIN | "probably" win by abstention (falsified) |
+| O2 (truth cleanlab, (b) given HOC) | bipolar | 0.9976 / 1.671 / 0.004 | 0.9991 / 1.773 / 0.007 | 1.0000 / 2.789 / 0.114, 37 | LOSS | LOSS (held) |
+| O2 | schizophrenia | 0.9865 / 1.877 / 0.007 | 0.9912 / 2.003 / 0.013 | 1.0000 / 2.846 / 0.119, 3 | LOSS | LOSS (held) |
+
+The head-to-head was **not won**, as predicted. The O1 schizophrenia WIN satisfies D-043's rule: arm (c) is valid and degenerate in fewer than 50 runs, and arm (b) is invalid. But arm (c)'s sets there are 2.5 times arm (b)'s and twice arm (a)'s, and arm (a) is valid on the same draws. Arm (a) was valid in all four rows. In O1, the cleanlab point given to arm (b) under-covers bipolar (0.81) and schizophrenia (0.84), as predicted for bipolar.
+
+### 6. Mean set size, truly bipolar test points, region A (D-043 §4(a))
+
+Arm (c) conservative gave **2.789**, which is "partly missed": between 1.6 and 2.9, against a predicted 3.1. Bipolar was in every set in 77 of 100 runs, eating disorder in 1 and schizophrenia in 32. The optimistic variant equalled arm (a) in 100 of 100 runs for every condition (prediction: at least 95).
+
+### 7. Why the secondary tier failed (an unpinned diagnostic)
+
+The secondary calls assumed `|F̂^k_k − F̂^k_l| ≈ 0.7` at the threshold. In region A and F1, for the first repetition's draw, the other labels' CDFs at S_(n_k) are already 0.82 to 1.00. So the width penalties are small near the top order statistic, and equation (22) admits an index close to n_k. Over that region's 100 runs, the median arm (c) conservative threshold in F1 was 0.966 to 0.993, against arm (a)'s 0.742 to 0.791. The conservative variant avoids τ̂_k = 1 by setting τ̂_k just below it. That is why D-043's outcome definition records these cells as admissible while the sets are nearly full. These figures come from the committed functions but are not pinned.
+
+### 8. Branches fired, as written in D-043 §6
+
+- **F1 and F2.** Depression, eating disorder and schizophrenia are admissible in both regions. Bipolar is split (28 and 20 degenerate runs). So the second bullet fires for the three conditions, verbatim:
+
+  > "**F1 and F2 come out admissible (secondary calls falsified).** The width terms were small at the thresholds that matter. D-047's "ok" verdicts are confirmed in practice, though still not guaranteed by the closed form, and C2 proceeds as D-047 scoped it. Report the miss on the scoreboard."
+
+  The third fires for bipolar: **"Split results.** Report per condition. C2's claim is restricted to the conditions that are admissible."
+
+  **That consequence text ("C2 proceeds as D-047 scoped it") assumed informativeness, which D-043 did not measure, so this run does not establish that consequence.** D-043 counted a condition as admissible whenever τ̂_k < 1. In F1 and F2, arm (c)'s admissible conditions still produce mean set sizes of 3.60 to 3.80 out of 4 and full-set rates of 0.68 to 0.83, against arm (a)'s 1.42 to 1.45 and 0.000 (§2).
+- **Prediction 2** fires per cell. "Where α̂_k exceeds δ_ci, D-042's flip formula fails as a predictor of admissibility, though it still holds as a sufficient test for degeneracy": this applies to the 7 cells listed in §3. "Where α̂_k is at or below δ_ci, the width terms were negligible there": this applies to the other 21, to the grid's resolution.
+- **Prediction 3(c), head-to-head not won,** fires verbatim: "As D-032 anticipated, the headline becomes the characterisation: where the coupling stops working, now with region width as a named cause."
+- **Prediction 3(b)** fires verbatim: "Assumption 5 failing broadly is itself reportable: Algorithm 2 retains Theorem 4's validity but loses Theorem 5's tightness on this problem." Arm (c) was valid in every cell.
+
+### 9. Consequence for C2's scope
+
+- **Established:**
+  - The closed-form guarantees hold in practice: certain cells and flip brackets, with no exception in 28 cells.
+  - Algorithm 2 with these regions is valid in every cell.
+  - Its robust degeneracies are real.
+  - D-042 and D-047's "ok" verdicts were mostly not overturned in the τ̂_k < 1 sense.
+- **Not established:** that arm (c) is informative. In every cell its sets are larger than the noise-blind arm (a)'s on the same data, and arm (a) was itself valid in every cell. Whether that makes arm (c) "uninformative" is a judgement this run cannot make, because no criterion was pre-registered.
+- **Next:** D-050 pre-registers an informativeness criterion before step 9's width and heterogeneity sweeps, or any further arm (c) run. Until it is committed and run, C2's claim is limited to validity, plus the head-to-head result, which was not won.
+
+**Evidence.** The commits and seeds under Context. `tests/test_conformal_arm_c.py` pins the tables in §§1 to 6, except the §7 diagnostic.
+
+**Consequences.**
+
+- D-043 carries a dated gap note: no informativeness criterion was pre-registered.
+- The reversal scoreboard counts D-043 as a fifth pre-registered prediction set, partly missed.
+- Roadmap steps 7 and 8 are closed. Step 9's α sweep is done, and its width and heterogeneity sweeps wait for D-050.
+
+**Links.** Results of D-043. Tests D-042 and D-047 in practice. Bears on D-032, D-049 and D-050.
+
 ---
 
 # Part 6 · Writing
@@ -2278,9 +2514,9 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Of those, not yet tested against a run | 1 (D-042's interface and sufficient degeneracy test) |
 | Claims made from full text read through a fetch tool (excerpts, not the PDF) | 18 |
 | Of those, materially wrong | **1** (the Ernala et al. N = 146 note) |
-| Pre-registered predictions recorded before a run | 4 |
+| Pre-registered predictions recorded before a run | 5 |
 | Of those, held in full | 2 (D-035's rule, D-036/D-037) |
-| Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
+| Of those, falsified or partly missed | 3 (D-034 falsified, D-040 partly missed, D-043 partly missed) |
 
 The fetch-tool row was added on 2026-10-26 from the audit recorded in
 `Docs/clinical-elicitation-matrix.md`. It counts the 17 audited claims from the four
@@ -2299,6 +2535,19 @@ against the source before it changes anything.
 The D-045 MentalRoBERTa replication is deliberately absent from the prediction block. Its
 only rule was qualitative ("small gap" versus "large gap") with no threshold fixed before the
 run, so it does not qualify as a pre-registered prediction and is not counted as held.
+
+**D-043 (scored in D-046, 2026-10-26) is partly missed.**
+
+- **Its primary tier held in full:** every certain cell and every flip bracket.
+- **Its secondary tier, labelled a judgement when it was written, mostly failed:**
+  - admissibility: 3 held, 15 falsified, 5 split;
+  - flip α: 1 held, 27 failed;
+  - region A bipolar set size: partly missed;
+  - Proposition 3 at the threshold: falsified for depression in F1, F3 and L1;
+  - O1 schizophrenia: WIN, against a predicted win by abstention.
+- **Its head-to-head call (not won) and its assumption calls held.**
+
+It is the first pre-registration split into a guaranteed tier and a judged tier, and the split did its job: no pass or fail call about D-042, D-047 or the code rested on the tier that failed. The failure has one cause. The judged factor of 0.7 for `|F̂^k_k − F̂^k_l|` at the threshold was wrong near the top order statistic, where the measured gap was a few hundredths (D-046 §7).
 
 **This table is the argument for D-033.** Keep it updated. If it ever shows a wrong claim made after reading a full paper, that is worth knowing too.
 
