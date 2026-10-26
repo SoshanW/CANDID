@@ -365,6 +365,28 @@ Two sub-runs, both diagnostic:
 Sub-run 2 is the argument for a region, made on synthetic data where the truth is
 known. It is worth having on its own.
 
+**Configuration and expectation, fixed 2026-10-26 before any arm (b) number exists.**
+Truth `T = make_transition(0.15, 0.0)`: bipolar → depression 15%, no other
+off-diagonal (the generator defaults committed at step 4, `db1a3c4`). Oracle point: the
+true `T`. Wrong point: `make_transition(0.046, 0.0)`. Both are converted to V with the
+population noisy prior `Tᵀρ`, which stands in for the corpus-wide proxy frequencies a
+practitioner would observe; the fixed-count calibration set's own frequencies are not
+used. α = 0.10, calibration counts as in step 5, 100 repetitions, separability 2.0.
+Each arm is reported as conservative (equation (22)) and optimistic (equation (25)),
+per D-049, with arm (a) alongside.
+
+*Expectation, from D-047's inflow argument.* With bipolar → depression as the only
+off-diagonal, every post labelled bipolar is truly bipolar: the bipolar row of M is
+(1, 0, 0, 0) under both the truth and the wrong point, and bipolar's calibration set is
+uncontaminated. Bipolar coverage should therefore be nominal in every arm (above it for
+the conservative variant), and the wrong point should **not** break it. The only
+contaminated calibration set is depression's, about 0.7% truly bipolar posts, so any
+arm differences should be small and confined there. If this holds, sub-run 2 does not
+make the argument for a region in this configuration, which contradicts the roadmap's
+"coverage should break". No configuration with inflow into a rare label is run here;
+choosing one is for D-043 to pre-register. Proposition 3's condition is measured
+without a prediction (D-049).
+
 ### Step 7 — PRE-REGISTER before arm (c) runs
 
 Write **D-043** in DECISIONS.md fixing branches and thresholds *before the numbers
