@@ -56,8 +56,8 @@ class ModelConfig:
     Attributes:
         pretrained_name: HF Hub id (or local path) of the base model. Defaults to
             MentalBERT; overridable for smoke tests with a tiny public model.
-        max_length: Token truncation limit. Docs/technical-contribution-in-depth.md
-            §6 caps fine-tuning at <=256 tokens.
+        max_length: Token truncation limit. D-011 fixes the baseline at a 256-token
+            cap (recorded in Docs/baseline-results.md).
         num_labels: Number of output classes; defaults to len(POC_CONDITIONS).
     """
 

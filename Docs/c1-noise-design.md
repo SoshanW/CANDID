@@ -13,8 +13,11 @@ hypothesis (referred to in planning as "H4"): that a condition-dependent transit
 is recoverable only for conditions with sufficient support / anchor availability, and is
 expected to fail for the rare, high-noise conditions (bipolar, schizophrenia)._
 
-Companion docs: `Docs/technical-contribution-in-depth.md` (§1 sets up `T`, §2.2 sets up the
-C2 threshold function `g`), `Docs/Chapter_01_Introduction_v2.md` (RQ1-RQ4), and
+Companion docs: `Docs/contribution-1.md` (why C1 became a diagnostic, D-030, which
+supersedes the estimator design below) and, for C2, `Docs/c2-interface.md` and
+`Docs/c2-elicitation-scoping.md` (`technical-contribution-in-depth.md`, which set up `T`
+and the C2 threshold function `g`, was removed in 94c031d),
+`Docs/Chapter_01_Introduction_v2.md` (RQ1-RQ4), and
 `Docs/baseline-results.md` (the C0 baseline whose out-of-fold softmax C1 will consume).
 
 ---
