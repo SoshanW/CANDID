@@ -19,6 +19,13 @@ from src.conformal.v_region import (
     region_from_matrices,
     transition_to_v,
 )
+from src.conformal.synthetic import (
+    SyntheticConfig,
+    SyntheticSample,
+    generate,
+    make_transition,
+    recover_clean_prior,
+)
 
 __all__ = [
     "ConditionBudget",
@@ -28,4 +35,9 @@ __all__ = [
     "max_admissible_offdiagonal_mass",
     "region_from_matrices",
     "transition_to_v",
+    "SyntheticConfig",
+    "SyntheticSample",
+    "generate",
+    "make_transition",
+    "recover_clean_prior",
 ]

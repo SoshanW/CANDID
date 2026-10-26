@@ -292,12 +292,25 @@ numbers in hand. **D-047 adds one fact:** pruning cannot rescue bipolar, because
 budget is exhausted near 1% depression → bipolar and the simplex ceiling sits near 4.7%,
 so D-031 can be decided on its other merits.
 
-### Step 4 — Synthetic generator with a known `T`
+### Step 4 — Synthetic generator with a known `T`. ✅ DONE 2026-10-26
 
 New `src/conformal/synthetic.py`. Draw a K = 4 problem at this project's real
 prevalences (roughly 0.81 / 0.10 / 0.06 / 0.04), a controllable true `T` with
 bipolar → depression as the dominant off-diagonal, and a scorer that emits softmax-like
 probabilities with a tunable separability parameter. Corrupt labels through `T`.
+
+**Built.** Clean prior `NOISY_PRIOR`; `make_transition(bipolar_to_depression,
+background)`; scores are a softmax of `separability · onehot(Y)` plus standard normal
+noise; labels corrupted through `T` independently of the scores, so Sesia's Assumption 1
+holds by construction. Seeded; `python -m src.conformal.synthetic` prints a summary.
+`tests/test_conformal_synthetic.py`, 11 tests.
+
+**Gates.** With `T = I` the proxy labels equal the clean labels on 100,000 draws. The
+recovered clean prior `ρ = (Tᵀ)⁻¹ρ̃` lands within four standard errors of the truth for
+three matrices at n = 10⁶, and across 200 seeds its z-scores have mean ≈ 0 and SD ≈ 1.
+Recorded as a numerical check on D-028 (amendment) bearing on open item 3, which stays
+open. The arm-side half of the sanity gate (arms coincide at `T = I`) needs steps 5
+and 6.
 
 **Sanity gate:** with `T = I`, all three arms must coincide. That identity check is the
 POC's own unit test — if it fails, nothing downstream means anything.
@@ -439,6 +452,8 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-26** — Step 4 done: synthetic generator with known `T`; T = I gate and the
+  ρ-recovery check pass (D-028 amendment; open item 3 stays open).
 - **2026-10-08** — Step 3b scoped (D-047): binding quantity identified as rare-label
   PPV; `src/conformal/elicited_region.py` and `Docs/c2-elicitation-scoping.md` added;
   §0, §2, §3, §5 and §6 updated.

@@ -544,6 +544,10 @@ Their HOC estimator obtains a **unique** transition matrix from noisy labels alo
 
 **UNVERIFIED.** The specific derivation `ρ = (Pᵀ)⁻¹ρ̃`, and the consequent observation that inconsistent models could be pruned (see D-025, D-031), **is not taken from any published paper.** It is a derivation produced during this session. **Check the algebra and have the supervisor check it before it enters the thesis as a contribution.**
 
+**Amendment (2026-10-26): a numerical check, not a verification.** Roadmap step 4's generator (`src/conformal/synthetic.py`) draws clean labels from `NOISY_PRIOR`, corrupts them through a known T independently of the scores, and recovers ρ with `v_region.transition_to_v`, the code every C2 number depends on. At n = 10⁶ and seed 11, three matrices (bipolar → depression 0.15 with background 0, 0.01 and 0.02 on the other off-diagonals; the last with bipolar → depression 0.30) recover bipolar at 0.0381, 0.0382 and 0.0380 against a true 0.038, while the observed noisy bipolar share is 0.0324, 0.0414 and 0.0443. Every component lies within four delta-method standard errors; the largest deviation, depression at z ≈ −2.5, is the realised clean draw itself (0.8109, z = −2.73 against the population prior), which the recovery tracks. Over 200 seeds at n = 2 × 10⁵ the recovery z-scores have mean −0.06 to 0.05 and standard deviation 1.01 to 1.05 per condition: unbiased, with a calibrated standard error. Pinned by `tests/test_conformal_synthetic.py`.
+
+What this does and does not establish. It confirms that the code inverts ρ̃ = Tᵀρ correctly when T is known exactly and Assumption 1 holds by construction; that identity is the law of total probability, so the check guards the implementation and the orientation, not the novelty. It says nothing about recovery under a misspecified T, about the pruning observation, or about whether the derivation is already published. **Open item 3 stays open** pending the supervisor's check.
+
 ---
 
 ## D-029 · Keep Mondrian (label-conditional), not marginal coverage
@@ -1870,7 +1874,7 @@ Applies D-019 and D-033.
 |---|---|---|---|
 | 1 | ~~Run HOC and `cleanlab` on the real data~~ **CLOSED 2026-08-09.** HOC on three representations (D-037, D-041) and cleanlab (D-039) all run; per-seed spread and prior persisted per arm | was D-030 | done |
 | 2 | Measure 2-NN *noisy*-label agreement per condition in MentalBERT space (**amended 2026-07-24: a one-sided falsification test, not confirmatory; see expanded note below**) | The clusterability diagnostic | Soshan |
-| 3 | Verify the `ρ = (Pᵀ)⁻¹ρ̃` derivation | D-028, D-031 | Soshan + supervisor |
+| 3 | Verify the `ρ = (Pᵀ)⁻¹ρ̃` derivation. **Numerical check passed 2026-10-26** (D-028 amendment: unbiased recovery with calibrated error on synthetic data with known T); the algebra and the novelty question still need the supervisor | D-028, D-031 | Soshan + supervisor |
 | 4 | Verify the prevalence arithmetic in D-018 against Zhu et al.'s Theorem 2. **Counts half CLOSED 2026-08-14** (D-018 amendment: 146,400 raw vs 139,898 deduplicated, both correct, provenance recorded); the Theorem 2 formula check itself is still open | The strongest result in the project | Soshan |
 | 5 | Decide prune vs no-prune | D-031 | Soshan + supervisor |
 | 6 | Source every elicited range to a specific clinical study. **Re-scoped 2026-10-08 (D-047):** the binding quantity is the worst-case PPV of each rare label (about 0.78 for bipolar at α = 0.10), not the misdiagnosis directions. Non-binding entries are partly sourced; the binding ones have no subreddit-level study | The main attack on C2 | Soshan |
