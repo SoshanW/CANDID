@@ -15,18 +15,27 @@ Results are reported per condition as the mean over repetitions, with the standa
 error of that mean, so a table entry can be compared against a nominal level with its
 own uncertainty attached.
 
-Run ``python -m src.conformal.poc`` for the step 5 report.
+Run ``python -m src.conformal.poc`` for the step 5 report and
+``python -m src.conformal.poc --step 6`` for step 6 (configuration fixed in the roadmap
+before the first run, commit ``951816d``).
 """
 
 from __future__ import annotations
 
 import argparse
+import functools
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 
-from src.conformal.c1_matrices import CALIBRATION_COUNTS, CONDITIONS
+from src.conformal.adaptive import (
+    InflationReference,
+    adaptive_thresholds,
+    proposition_three_check,
+    zero_width_box,
+)
+from src.conformal.c1_matrices import CALIBRATION_COUNTS, CONDITIONS, NOISY_PRIOR
 from src.conformal.split_conformal import (
     SetMetrics,
     evaluate_sets,
@@ -34,13 +43,22 @@ from src.conformal.split_conformal import (
     predict_sets,
     standard_thresholds,
 )
-from src.conformal.synthetic import SyntheticConfig, SyntheticSample, generate
+from src.conformal.synthetic import (
+    SyntheticConfig,
+    SyntheticSample,
+    generate,
+    make_transition,
+)
+from src.conformal.v_region import expected_sup_deviation, transition_to_v
 
 __all__ = [
     "ArmSummary",
     "Draw",
+    "PropositionThreeSummary",
+    "Step6Result",
     "draw_calibration_and_test",
     "run_arm",
+    "run_step6",
 ]
 
 K = len(CONDITIONS)
@@ -162,8 +180,164 @@ def format_summary(summary: ArmSummary) -> str:
     return "\n".join(lines)
 
 
+@functools.lru_cache(maxsize=None)
+def c_for_counts(counts: tuple[int, ...]) -> dict[int, float]:
+    """``c(n_k)`` of eq. (16) for each calibration count, computed once per process."""
+    return {n: expected_sup_deviation(n) for n in counts}
+
+
+STEP6_TRUTH = (0.15, 0.0)
+"""Bipolar to depression 15%, no other off-diagonal (roadmap step 6, fixed in 951816d)."""
+
+STEP6_WRONG_POINT = (0.046, 0.0)
+"""The HOC-like wrong point estimate: bipolar to depression 4.6%."""
+
+
+@dataclass(frozen=True)
+class PropositionThreeSummary:
+    """Proposition 3's condition across repetitions, per condition (D-049).
+
+    Attributes:
+        name: which point estimate the optimistic variant was given.
+        holds_as_stated: share of repetitions where the printed condition holds.
+        holds_at_threshold: share where the at-threshold form holds.
+        inf_delta: ``inf_t Delta_k(t)``, shape ``(K,)``; does not vary by repetition.
+        mean_at_threshold: mean ``Delta_k(tau_k)`` over repetitions.
+        mean_bound: mean ``delta_ci - (1 - alpha) / n_k`` over repetitions.
+    """
+
+    name: str
+    holds_as_stated: np.ndarray
+    holds_at_threshold: np.ndarray
+    inf_delta: np.ndarray
+    mean_at_threshold: np.ndarray
+    mean_bound: np.ndarray
+
+
+@dataclass(frozen=True)
+class Step6Result:
+    """Every arm of step 6 and the Proposition 3 diagnostics."""
+
+    arms: list[ArmSummary]
+    proposition_three: list[PropositionThreeSummary]
+    v_points: dict[str, np.ndarray]
+
+
+def run_step6(
+    reps: int = 100,
+    alpha: float = 0.10,
+    n_test: int = 20_000,
+    separability: float = 2.0,
+    base_seed: int = 0,
+    counts: list[int] = CALIBRATION_COUNTS,
+    reference_n: int = 2_000_000,
+) -> Step6Result:
+    """Arm (a), and arm (b) given the oracle and the wrong point, in both variants."""
+    truth = make_transition(*STEP6_TRUTH)
+    # Population proxy frequencies; the fixed-count calibration set's are not used.
+    noisy_prior = truth.T @ NOISY_PRIOR
+    points = {
+        "oracle": transition_to_v(truth, noisy_prior)[0],
+        "wrong point": transition_to_v(make_transition(*STEP6_WRONG_POINT), noisy_prior)[0],
+    }
+    c_n_k = c_for_counts(tuple(counts))
+    draws = [
+        draw_calibration_and_test(
+            truth, rep, counts=counts, n_test=n_test, separability=separability,
+            base_seed=base_seed,
+        )
+        for rep in range(reps)
+    ]
+
+    arms = [run_arm("arm (a)", lambda s, y: standard_thresholds(s, y, alpha), draws)]
+    for name, v in points.items():
+        low, upp = zero_width_box(v)
+        for variant in ("conservative", "optimistic"):
+            arms.append(
+                run_arm(
+                    f"arm (b) {name}, {variant}",
+                    lambda s, y, low=low, upp=upp, variant=variant: adaptive_thresholds(
+                        s, y, low, upp, alpha, variant=variant, c_n_k=c_n_k
+                    ).tau,
+                    draws,
+                )
+            )
+
+    reference_sample = generate(
+        SyntheticConfig(
+            n=reference_n, transition=truth, separability=separability,
+            seed=base_seed + 10**6,
+        )
+    )
+    reference = InflationReference(
+        nonconformity_scores(reference_sample.probs),
+        reference_sample.y,
+        reference_sample.y_tilde,
+    )
+    proposition = []
+    for name, v in points.items():
+        low, upp = zero_width_box(v)
+        checks = [
+            proposition_three_check(
+                reference,
+                adaptive_thresholds(
+                    nonconformity_scores(d.calibration.probs), d.calibration.y_tilde,
+                    low, upp, alpha, variant="optimistic", c_n_k=c_n_k,
+                ),
+                alpha,
+            )
+            for d in draws
+        ]
+        proposition.append(
+            PropositionThreeSummary(
+                name=name,
+                holds_as_stated=np.mean([[c.holds_as_stated for c in r] for r in checks], axis=0),
+                holds_at_threshold=np.mean(
+                    [[c.holds_at_threshold for c in r] for r in checks], axis=0
+                ),
+                inf_delta=np.array([c.inf_delta for c in checks[0]]),
+                mean_at_threshold=np.mean([[c.at_threshold for c in r] for r in checks], axis=0),
+                mean_bound=np.mean([[c.bound for c in r] for r in checks], axis=0),
+            )
+        )
+    return Step6Result(arms=arms, proposition_three=proposition, v_points=points)
+
+
+def format_proposition_three(summary: PropositionThreeSummary) -> str:
+    lines = [
+        f"Proposition 3, optimistic variant given the {summary.name}",
+        f"  {'condition':<16}{'inf Delta':>10}{'Delta(tau)':>11}{'bound':>9}"
+        f"{'as stated':>11}{'at tau':>8}",
+    ]
+    for k, name in enumerate(CONDITIONS):
+        lines.append(
+            f"  {name:<16}{summary.inf_delta[k]:>10.4f}{summary.mean_at_threshold[k]:>11.4f}"
+            f"{summary.mean_bound[k]:>9.4f}{summary.holds_as_stated[k]:>11.2f}"
+            f"{summary.holds_at_threshold[k]:>8.2f}"
+        )
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - reporting
     args = _parse_args(argv)
+    if args.step == 6:
+        result = run_step6(
+            reps=args.reps, alpha=args.alpha, n_test=args.n_test,
+            separability=args.separability, base_seed=args.seed,
+        )
+        print(
+            f"Step 6: truth bipolar->depression {STEP6_TRUTH[0]}, wrong point "
+            f"{STEP6_WRONG_POINT[0]}, alpha = {args.alpha}, reps = {args.reps}, "
+            f"calibration counts {CALIBRATION_COUNTS}, n_test = {args.n_test}, "
+            f"separability = {args.separability}"
+        )
+        for name, v in result.v_points.items():
+            print(f"V ({name}):\n{np.array2string(v, precision=4, suppress_small=True)}")
+        for summary in result.arms:
+            print(format_summary(summary))
+        for summary in result.proposition_three:
+            print(format_proposition_three(summary))
+        return 0
     transition = np.eye(K)
     draws = [
         draw_calibration_and_test(
@@ -190,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - reporting
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--step", type=int, choices=(5, 6), default=5)
     parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--reps", type=int, default=100)
     parser.add_argument("--n-test", type=int, default=20_000)

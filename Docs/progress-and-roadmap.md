@@ -26,8 +26,9 @@ DECISIONS.md wins._
   **3.6 times wider** than Sesia's Algorithm 2 can absorb.
 - **C2 (noise-coupled calibrated abstention) is BARELY STARTED.** `src/conformal/`
   holds the input side (the T → V conversion and the closed-form degeneracy test,
-  D-042). There is still no conformal calibration, no abstention, and no elicited
-  region. **C2's actual claim has not been tested.**
+  D-042) and, since 2026-10-26, the POC harness: synthetic generator, arm (a), and a
+  port of Algorithm 2 (arm (b)) in both variants (D-048, D-049). There is still no
+  elicited region and no arm (c). **C2's actual claim has not been tested.**
 - **C3 (shift evaluation) has NOT STARTED.** DAIC-WoZ loads (188 participants) but is
   not wired into any evaluation.
 - **Step 3b (elicitation scoping) is DONE as a derivation (D-047, 2026-10-08).** The
@@ -37,10 +38,14 @@ DECISIONS.md wins._
   study exists. Projected: bipolar inadmissible at the C0 operating point, depression and
   eating disorder admissible, schizophrenia open. Full record:
   `Docs/c2-elicitation-scoping.md`.
-- **Immediately next:** take D-047 to the supervisor with open items 3, 5 and 14 (verify
-  D-028's conversion; prune or not; whether to elicit label PPVs directly). Then §5 step
-  4, the synthetic generator, with D-043 pre-registering D-047's per-condition
-  predictions.
+- **§5 steps 4 to 6 are DONE (2026-10-26).** Every gate passed. In step 6's configuration
+  (outflow from bipolar only) the wrong point estimate did **not** break coverage, as
+  expected before the run and against the roadmap's original expectation, and the
+  optimistic variant reduced exactly to arm (a).
+- **Immediately next:** take D-047, D-049 and step 6 to the supervisor with open items 3,
+  5 and 14. Then §5 step 7: D-043 pre-registers D-047's per-condition predictions, the
+  Proposition 3 diagnostic (D-049), and a configuration with inflow into a rare label,
+  the case step 6 shows the argument for a region needs.
 
 ---
 
@@ -353,7 +358,7 @@ Theory puts each mean in [0.900, 0.900 + 1/(n_k + 1)]; all four sit within one S
 it. The pinned test (`tests/test_conformal_split_conformal.py`) uses smaller counts and
 200 repetitions, with a tolerance of three SEs either side of that interval.
 
-### Step 6 — Arm (b), Algorithm 2 with a plug-in point estimate
+### Step 6 — Arm (b), Algorithm 2 with a plug-in point estimate. ✅ DONE 2026-10-26
 
 Two sub-runs, both diagnostic:
 
@@ -386,6 +391,57 @@ make the argument for a region in this configuration, which contradicts the road
 "coverage should break". No configuration with inflow into a rare label is run here;
 choosing one is for D-043 to pre-register. Proposition 3's condition is measured
 without a prediction (D-049).
+
+**Built.** `src/conformal/adaptive.py` ports Algorithm 2 from equations (12) and (15)
+to (22) and (25), checked term by term against `cln/classification.py` (MIT), reusing
+`v_region.correction_term` for δ_ci. Two documented choices: ζ̂^upp defaults to the
+row's widest interval, a valid bound from the box that is zero for a point estimate,
+and δ̂^(V)_k* is taken per row as equation (19) defines it, where `cln` takes the
+matrix-wide maximum. `python -m src.conformal.poc --step 6` reproduces the tables;
+`tests/test_conformal_poc.py` pins them, and `tests/test_conformal_adaptive.py` holds
+the gates.
+
+**Gates: passed.** At T = I the optimistic variant equals arm (a) exactly, and the
+conservative variant sits at rank ⌈n_k(1 − α + c(n_k))⌉ (D-049's corrected gate). With
+a point estimate, Algorithm 2 reproduces an independent implementation of equations
+(13) to (17), confirming D-049's reduction to Algorithm 1.
+
+**Result.** V's only off-diagonal is depression's row: −0.0070 (oracle), −0.0019
+(wrong point). Coverage against the clean label, mean ± SE over 100 repetitions:
+
+| arm | bipolar | depression | eating disorder | schizophrenia | mean set size |
+|---|---|---|---|---|---|
+| (a) noise-blind | 0.9005 ± 0.0018 | 0.9059 ± 0.0003 | 0.9004 ± 0.0009 | 0.9016 ± 0.0014 | 1.250 to 1.252 |
+| (b) oracle, conservative | 0.9269 ± 0.0016 | 0.9075 ± 0.0003 | 0.9171 ± 0.0009 | 0.9217 ± 0.0013 | 1.325 to 1.333 |
+| (b) oracle, optimistic | identical to (a) | | | | 1.250 to 1.252 |
+| (b) wrong point, conservative | 0.9269 ± 0.0016 | 0.9106 ± 0.0003 | 0.9171 ± 0.0009 | 0.9217 ± 0.0013 | 1.329 to 1.336 |
+| (b) wrong point, optimistic | identical to (a) | | | | 1.250 to 1.252 |
+
+No full sets in any arm; empty-set rates are at most 0.0010.
+
+1. **Oracle: coverage holds** in both variants, as the roadmap expected.
+2. **Wrong point: coverage does not break**, as expected before the run and contrary to
+   the roadmap's original text. Bipolar's coverage is identical under both points, and
+   under-estimating the noise makes the conservative variant cover depression *more*
+   (0.9106 against 0.9075), because it corrects less in a regime where noise already
+   makes standard conformal conservative (Corollary 1).
+3. **The optimistic variant is exactly arm (a)** on every repetition, for both points:
+   Δ̂ never exceeds δ_ci, so equation (25) always selects −(1 − α)/n_k.
+4. **The conservative variant is strictly less informative than arm (a)** at the C0
+   calibration counts: thresholds higher on every repetition, mean set size 1.33 against
+   1.25, and bipolar over-covered by 2.7 points. That is the c(n_k) price, paid with no
+   noise correction to offset it in this configuration.
+5. **Proposition 3 fails on every repetition in both forms**, for both points, and the
+   optimistic variant does not under-cover. The condition is sufficient, not necessary,
+   and its failure did not cost coverage here. Bipolar's inf Δ of −0.0006 is Monte Carlo
+   error: with no inflow its true Δ is zero.
+
+**What this means for the argument.** Sub-run 2 does not make the argument for a region
+in this configuration, because a wrong point only matters where it misstates *inflow*
+into a label (D-047). A configuration with inflow into a rare label is the case to
+pre-register in D-043. Points 3 and 4 also bear on D-032's head-to-head: at these
+calibration counts, arm (b) or (c) must recover more than c(n_k) before the
+conservative variant can beat arm (a) on set size.
 
 ### Step 7 — PRE-REGISTER before arm (c) runs
 
@@ -499,6 +555,10 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-26** — Step 6 done: Algorithm 2 ported, both variants; gates pass. Wrong
+  point did not break coverage (expected before the run, contrary to the original
+  roadmap text); optimistic variant reduced exactly to arm (a); Proposition 3 failed
+  in both forms without under-coverage.
 - **2026-10-26** — Step 5 done: arm (a) built under D-048; T = I gate passes (coverage
   nominal for all four conditions). D-049 recorded; step 4's gate text corrected.
 - **2026-10-26** — Step 4 done: synthetic generator with known `T`; T = I gate and the

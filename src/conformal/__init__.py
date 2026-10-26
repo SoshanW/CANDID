@@ -19,6 +19,13 @@ from src.conformal.v_region import (
     region_from_matrices,
     transition_to_v,
 )
+from src.conformal.adaptive import (
+    AdaptiveCalibration,
+    InflationReference,
+    adaptive_thresholds,
+    proposition_three_check,
+    zero_width_box,
+)
 from src.conformal.split_conformal import (
     SetMetrics,
     evaluate_sets,
@@ -52,4 +59,9 @@ __all__ = [
     "nonconformity_scores",
     "predict_sets",
     "standard_thresholds",
+    "AdaptiveCalibration",
+    "InflationReference",
+    "adaptive_thresholds",
+    "proposition_three_check",
+    "zero_width_box",
 ]
