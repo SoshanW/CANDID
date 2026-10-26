@@ -1972,9 +1972,25 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Claims made after reading the full paper | 7 |
 | Of those, materially wrong | **0** |
 | Of those, not yet tested against a run | 1 (D-042) |
+| Claims made from full text read through a fetch tool (excerpts, not the PDF) | 18 |
+| Of those, materially wrong | **1** (the Ernala et al. N = 146 note) |
 | Pre-registered predictions recorded before a run | 4 |
 | Of those, held in full | 2 (D-035's rule, D-036/D-037) |
 | Of those, falsified or partly missed | 2 (D-034 falsified, D-040 partly missed) |
+
+The fetch-tool row was added on 2026-10-26 from the audit recorded in
+`Docs/clinical-elicitation-matrix.md`. It counts the 17 audited claims from the four
+fetched sources behind D-047 (claims 1 to 8, Zimmerman et al. 2010; 10 to 13, Birnbaum
+et al. 2017; 14 to 16, Ernala et al. 2019; 20 and 21, Dagani et al. 2017), plus the
+interpretation that Ernala et al. give both 153 and 146 genuine self-reporters. Claims
+9, 19 and 22 state only what an abstract says and are excluded. The one wrong claim is
+that interpretation: the 146 is Birnbaum et al.'s count. It was not load-bearing (the
+PPV used 153) and the audit caught it before it reached the thesis.
+
+NotebookLM returned PARTIAL or UNSUPPORTED for Birnbaum claims 11 to 13, all three of
+which are verbatim in the publisher's JATS XML under *Methods, Clinician Appraisal*.
+Retrieval misses happen in both directions, so a negative NotebookLM verdict is checked
+against the source before it changes anything.
 
 The D-045 MentalRoBERTa replication is deliberately absent from the prediction block. Its
 only rule was qualitative ("small gap" versus "large gap") with no threshold fixed before the
