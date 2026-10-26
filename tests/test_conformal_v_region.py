@@ -240,3 +240,66 @@ def test_feasibility_frontier_matches_the_documented_budgets():
     expected = [0.3783, 0.4970, 0.4406, 0.4107]
     for budget, value in zip(budgets, expected):
         assert budget.max_offdiagonal_mass == pytest.approx(value, abs=0.002)
+
+
+def _width_example_box(width):
+    """The D-042 amendment's worked example: every V_upp off-diagonal -0.02."""
+    upp = np.full((4, 4), -0.02)
+    np.fill_diagonal(upp, 1.0)
+    return upp - width * (1 - np.eye(4)), upp
+
+
+def _width_example_scores(n=481):
+    """Calibration data realising the example's CDFs for condition 0.
+
+    481 points per proxy label. Points labelled 0 have class-0 scores i / 482, so
+    F^0_0(S_(i)) = i / n. Every other label's class-0 scores sit above S_(n), so
+    F^0_l(S_(i)) = 0 for all i. The other columns are filler.
+    """
+    scores = np.full((4 * n, 4), 0.5)
+    y_tilde = np.repeat(np.arange(4), n)
+    scores[:n, 0] = np.arange(1, n + 1) / (n + 1)
+    scores[n:, 0] = 0.999
+    return scores, y_tilde
+
+
+def test_width_terms_can_degenerate_a_condition_that_passes_d042():
+    """D-042 amendment (2026-10-26): with width, delta_ci <= alpha is not sufficient.
+
+    n_k = n_star = 481, box width 0.1: delta_ci = 0.0965 < alpha, so D-042's test
+    calls it "ok". Equation (20) gives Delta_ci(S_(i)) = -0.54 i / n, and equation
+    (22) then needs 0.46 i / n >= 0.9965, which no i satisfies, so tau_k = 1.
+    """
+    from src.conformal.adaptive import adaptive_thresholds
+
+    n, alpha = 481, 0.10
+    low, upp = _width_example_box(0.1)
+    delta = correction_term(0, low, upp, n, n)
+    assert delta == pytest.approx(0.0965, abs=5e-4)
+    assert delta < alpha  # "ok" under D-042's test
+
+    i = np.arange(1, n + 1)
+    f_kk, f_l = i / n, np.zeros(n)
+    term_a = 3 * (-0.02) * (f_l - f_kk)
+    term_b = 0.1 * 3 * np.abs(f_kk - f_l)
+    term_c = 0.1 * 3 * np.abs(f_l - f_kk)
+    delta_hat = term_a - term_b - term_c
+    np.testing.assert_allclose(delta_hat, -0.54 * i / n)
+    assert not (i / n >= 1 - alpha - delta_hat + delta).any()
+
+    scores, y_tilde = _width_example_scores(n)
+    result = adaptive_thresholds(scores, y_tilde, low, upp, alpha, variant="conservative")
+    assert result.tau[0] == 1.0
+    assert result.delta_ci[0] == pytest.approx(delta, abs=2e-3)
+
+
+def test_same_example_with_zero_width_survives():
+    from src.conformal.adaptive import adaptive_thresholds
+
+    n, alpha = 481, 0.10
+    low, upp = _width_example_box(0.0)
+    assert correction_term(0, low, upp, n, n) == pytest.approx(0.0397, abs=5e-4)
+    scores, y_tilde = _width_example_scores(n)
+    result = adaptive_thresholds(scores, y_tilde, low, upp, alpha, variant="conservative")
+    assert result.index[0] == 427
+    assert result.tau[0] < 1.0

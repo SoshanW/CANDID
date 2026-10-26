@@ -1727,6 +1727,30 @@ sets τ̂_k = 1 on this criterion. Its coverage then rests on Proposition 3's co
 on Theorem 4. The numbers here are unchanged; their scope is narrowed to the variant
 D-049 makes the arm of record.
 
+**Amendment (2026-10-26): a derivation error in §3. The lower bound `0 ≤ Δ̂_ci_k(S_(n_k))` is false once the box has width.** Equation (20) (JRSSB p. 806; arXiv source label `eq:delta-hat-k-epsilon-bound`) is
+
+> Δ̂^ci_k(t) := Σ_{l≠k} V̂^upp_kl (F̂^k_l(t) − F̂^k_k(t)) − δ̂^(V)_k* (K − 1) |F̂^k_k(t) − Σ_{l≠k} F̂^k_l(t) / (K − 1)| − |ζ̂^upp_k| Σ_{l≠k} |F̂^k_l(t) − F̂^k_k(t)|,
+
+with δ̂^(V)_kl := V̂^upp_kl − V̂^low_kl (p. 805), δ̂^(V)_k* := max_{l≠k} δ̂^(V)_kl (equation (19), p. 806), and ζ̂^upp_k "a 1 − α_V upper confidence bound for" ζ̂_k := max_{l≠k}(V̂^upp_kl − V_kl) − min_{l≠k}(V̂^upp_kl − V_kl) (equation (19) and the text after it, p. 806). §3 bounded only the first term. The second and third are non-negative and are subtracted, so with any width Δ̂_ci can be negative. Then `δ_ci ≤ α` no longer keeps i = n_k in Î^ci_k, and the condition can enter every set. **Worked instance.** It is pinned by `tests/test_conformal_v_region.py::test_width_terms_can_degenerate_a_condition_that_passes_d042`.
+
+- **Setup.** K = 4, α = 0.10, n_k = n* = 481. Every V̂^upp_kl = −0.02 and every off-diagonal interval has width 0.1, so δ̂^(V)_k* = 0.1, and ζ̂^upp_k = 0.1 as extracted from the box.
+- **Correction term.** `v_region.correction_term` gives c(481) = 0.0283 and **δ_ci = 0.0965 < α**, so D-042's test calls the condition "ok".
+- **Assumed CDFs.** The calibration points labelled k have distinct class-k scores, so F̂^k_k(S_(i)) = i/481. Every other label's class-k scores lie above S_(481), so F̂^k_l(S_(i)) = 0 for every l ≠ k and every i.
+- **Equation (20).** The three terms are 0.06 i/n, 0.30 i/n and 0.30 i/n, so Δ̂_ci(S_(i)) = −0.54 i/n.
+- **Equation (22).** It requires i/n ≥ 0.9965 + 0.54 i/n, that is 0.46 i/n ≥ 0.9965, which no i/n ≤ 1 satisfies. At i = 1, 240, 433 and 481 the right-hand side is 0.998, 1.266, 1.483 and 1.537. So Î^ci_k is empty and τ̂_k = 1, although δ_ci < α. The Algorithm 2 port returns τ̂_k = 1 on data realising these CDFs.
+- **Zero-width comparison.** The same instance with a zero-width box gives δ_ci = 0.0397 and Δ̂_ci = +0.06 i/n. The first admissible index is i = 427, and the condition survives.
+
+An independent check of equation (20) is recorded in D-043.
+
+**Consequence.** Once the box has width, `δ_ci ≤ α` is **no longer sufficient** for a condition to survive.
+
+- **The true necessary condition is `δ_ci ≤ α + D̂_max`.** As §3 already recorded, a borderline cell can survive.
+- **Every robust degenerate verdict stands:** region B bipolar and schizophrenia here, and L1 and R0 bipolar in D-047. The upper bound `Δ̂_ci ≤ D̂_max` is sound, because both width terms only lower Δ̂_ci.
+- **Every "survives" or "ok" verdict is unproven** pending D-043's run, in §4 and §6 here and in `c2-interface.md` §6 and §7. That includes region A bipolar's "survives by 0.008". The one exception is depression in region A, whose margin exceeds the largest possible width penalty.
+- **The budget table (0.378 and the rest) is a necessary condition only,** up to the borderline margin §3 already named. A region over budget does not survive, except possibly at a borderline margin. A region within budget is not thereby shown to survive.
+
+Counted on the reversal scoreboard as the first materially wrong claim made after reading a full paper.
+
 ---
 
 ## D-044 · Pretraining-corpus overlap between MentalBERT and the label-generating subreddits
@@ -1854,6 +1878,14 @@ D-042's δ_ci, which is that of Algorithm 2 with equation (22). Under the optimi
 variant, equation (25), no condition degenerates on this criterion, and the question
 becomes whether Proposition 3's condition holds, which needs the true V. The numbers are
 unchanged; their scope is the arm of record set by D-049.
+
+**Amendment (2026-10-26): the frontier inherits D-042's derivation error.** Every verdict above uses D-042's δ_ci comparison, whose lower bound `0 ≤ Δ̂_ci` fails once the box has width (D-042 amendment of this date; equation (20)). Every region here has width. Therefore:
+
+- **The robust degenerate verdicts stand:** L1 and R0 bipolar.
+- **Every "ok" verdict is unproven pending D-043's run.** This covers all four conditions in F1 and F2, and depression, eating disorder and schizophrenia in F3, L1 and R0. The borderline verdicts (F3 bipolar, R0 schizophrenia) are also undetermined.
+- **The budget, the PPV floor of about 0.78, and the grid boundaries are necessary conditions only,** up to the borderline margin D-042 already named. A region failing them fails D-042's test. A region meeting them is not thereby shown to survive.
+
+The literature comparison is unaffected, since it already sits below the necessary floor.
 
 ---
 
@@ -2051,9 +2083,9 @@ The elicited set needs each range tied to a specific study. The *directions* are
 
 | Claims made from abstracts or snippets | 6 |
 | Of those, materially wrong | **6** |
-| Claims made after reading the full paper | 7 |
-| Of those, materially wrong | **0** |
-| Of those, not yet tested against a run | 1 (D-042) |
+| Claims made after reading the full paper | 8 |
+| Of those, materially wrong | **1** (D-042's `0 ≤ Δ̂_ci`, inherited by D-047) |
+| Of those, not yet tested against a run | 1 (D-042's interface and sufficient degeneracy test) |
 | Claims made from full text read through a fetch tool (excerpts, not the PDF) | 18 |
 | Of those, materially wrong | **1** (the Ernala et al. N = 146 note) |
 | Pre-registered predictions recorded before a run | 4 |
@@ -2099,6 +2131,19 @@ interval box on the off-diagonals of `V = M⁻¹`, and that its degenerate case 
 closed-form inequality. It is counted separately as untested because no run has checked
 it. D-043 should record the α at which each condition is predicted to flip, so that the
 simulation can either confirm it or move it into the wrong column.
+
+**The eighth, and the first full-paper claim found materially wrong (2026-10-26).**
+D-042 §3 stated `0 ≤ Δ̂_ci_k(S_(n_k)) ≤ D̂_max`, and its "survives" verdicts rested on
+the lower bound. Equation (20), in the same paper read in full, subtracts two width terms
+that make Δ̂_ci negative once the box has width (D-042 amendment of this date, with a
+worked instance). It is split out from the seventh claim because the two parts have
+different status. The interface, and the upper bound behind the robust degenerate
+verdicts, still stand untested. The lower bound is wrong, and that is settled by the
+equation, not by a run. D-047 inherited the error: its frontier, its PPV floor of about
+0.78, and every "ok" verdict became necessary conditions only. The source was
+read in full, and the bound was derived from equation (20)'s first term alone; the
+record does not show whether the other two terms were overlooked or judged negligible. It was caught while writing D-043's pre-registration, before any
+arm (c) run, and confirmed independently from the arXiv source.
 
 **The second block is the more useful one, and it is deliberately separate.** A project
 that only recorded predictions it got right would be recording nothing. Two of four

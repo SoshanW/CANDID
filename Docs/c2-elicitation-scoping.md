@@ -13,6 +13,21 @@ lists as unverified._
 
 ## 0. The answer
 
+> **Amendment (2026-10-26, D-042 amendment).** This document's verdicts use D-042's
+> δ_ci comparison, which assumed `0 ≤ Δ̂_ci`. Sesia et al.'s equation (20) subtracts two
+> width terms, so once a box has width, `δ_ci ≤ α` is **no longer sufficient** for a
+> condition to survive. Every region below has width.
+>
+> - The robust degenerate verdicts (L1 and R0 bipolar) stand.
+> - Every "ok" or "passes" verdict is **unproven pending D-043's run**.
+> - The budget and the PPV floor of about 0.78 in point 2 are **necessary conditions
+>   only**, up to the borderline margin D-042 names: falling below the floor fails
+>   D-042's test, but meeting it is not shown to be enough.
+>
+> Point 1 should be read as "a region can meet all four necessary conditions". The
+> projected outcome below is unchanged for bipolar, and unproven for the conditions it
+> calls admissible.
+
 1. **A region can fit all four budgets.** At α = 0.10 and n\* = 481 it needs, at its
    pessimistic end, roughly: depression into each rare label at most 0.5% (the
    boundary sits near 1%), rare into rare at most about 0.5% to 2%, and leakage into
@@ -103,6 +118,17 @@ rare-to-rare inflow stays small.
 ---
 
 ## 3. The feasibility frontier
+
+> **Amendment (2026-10-26).** The "ok" verdicts in this section, and every "passes"
+> cell in the grid, apply D-042's test `δ_ci ≤ α`. Once a box has width, that test is
+> no longer sufficient (D-042 amendment; equation (20)'s two width terms can make
+> Δ̂_ci negative).
+>
+> - The robust degenerate verdicts (L1 and R0 bipolar) stand.
+> - Every "ok" and every passing cell is **unproven pending D-043's run**.
+> - Grid cells marked "none" and the PPV boundary of 0.744 to 0.780 remain
+>   **necessary** conditions, up to D-042's borderline margin: regions below them fail
+>   D-042's test, and regions above them are not shown to pass.
 
 Five constructed regions. **None of them is an elicitation**; they map where the
 boundary sits. All lower bounds are zero except in R0, and each box is propagated to V
