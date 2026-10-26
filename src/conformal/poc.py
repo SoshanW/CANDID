@@ -80,14 +80,16 @@ def _fixed_count_sample(
     counts: list[int],
     separability: float,
     seed: int,
+    clean_prior: np.ndarray = NOISY_PRIOR,
 ) -> SyntheticSample:
     """Draw until every proxy-label class has its count, then keep the first ``n_k``."""
-    expected_share = np.asarray(transition, dtype=float).T @ SyntheticConfig(
-        n=1, transition=transition
-    ).clean_prior
+    expected_share = np.asarray(transition, dtype=float).T @ np.asarray(clean_prior, dtype=float)
     pool = int(1.5 * max(c / s for c, s in zip(counts, expected_share))) + 1_000
     sample = generate(
-        SyntheticConfig(n=pool, transition=transition, separability=separability, seed=seed)
+        SyntheticConfig(
+            n=pool, transition=transition, clean_prior=clean_prior,
+            separability=separability, seed=seed,
+        )
     )
     keep = []
     for k, n_k in enumerate(counts):
@@ -110,13 +112,19 @@ def draw_calibration_and_test(
     n_test: int = 20_000,
     separability: float = 2.0,
     base_seed: int = 0,
+    clean_prior: np.ndarray = NOISY_PRIOR,
 ) -> Draw:
-    """Calibration and test sets for repetition ``rep``, on disjoint seed streams."""
+    """Calibration and test sets for repetition ``rep``, on disjoint seed streams.
+
+    ``clean_prior`` defaults to ``NOISY_PRIOR`` (steps 5 and 6). D-043's arm (c) runs
+    pass the prior recovered from each region's synthetic truth instead.
+    """
     seed = base_seed + 2 * rep
-    calibration = _fixed_count_sample(transition, counts, separability, seed)
+    calibration = _fixed_count_sample(transition, counts, separability, seed, clean_prior)
     test = generate(
         SyntheticConfig(
-            n=n_test, transition=transition, separability=separability, seed=seed + 1
+            n=n_test, transition=transition, clean_prior=clean_prior,
+            separability=separability, seed=seed + 1,
         )
     )
     return Draw(calibration=calibration, test=test)
