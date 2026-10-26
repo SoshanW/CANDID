@@ -100,6 +100,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-040 | HOC on representations not trained on the project's labels (pre-registration) | ACTIVE | C1 |
 | D-041 | D-040 result: HOC's structure is stable, its magnitude is representation-dependent | ACTIVE | C1 |
 | D-042 | Sesia's Algorithm 2 interface pinned; degeneracy is closed-form, and it strengthens C1 | ACTIVE | C1/C2 |
+| D-043 | Pre-registration for arm (c): closed-form brackets, judged predictions, and the head-to-head | OPEN (pre-registration, awaiting review and commit) | C2 |
 | D-044 | Pretraining-corpus overlap between MentalBERT and the label-generating subreddits | ACTIVE | C1/Data |
 | D-045 | MentalRoBERTa replication result: MentalBERT retained as the encoder of record | ACTIVE | Engineering |
 | D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
@@ -1946,6 +1947,195 @@ The gate is now two tests at T = I: the optimistic variant equals arm (a) exactl
 **Consequences.** Every arm table carries a conservative and an optimistic line. D-042 and D-047 carry dated amendments narrowing their frontier to the conservative variant; their numbers do not change. On the synthetic harness, step 6 records, per condition and run, whether Proposition 3's condition holds in both forms and whether the optimistic variant under-covers. **D-043 must pre-register a prediction for this**; none is made here.
 
 **Links.** Depends on D-031, D-041, D-042 and D-048. Amends D-042 and D-047. Corrects roadmap step 4. Precedes D-043.
+
+---
+
+## D-043 · Pre-registration for arm (c): closed-form brackets, judged predictions, and the head-to-head
+**Date:** 2026-10-26 · **Status:** OPEN (pre-registration; becomes ACTIVE when committed, before any arm (c) run) · **Category:** C2
+
+**Decision.** The run specification, predictions, thresholds and branch rules below are fixed before arm (c) is run. Predictions come in two tiers, and only the first makes pass or fail calls on its own:
+
+- **Primary.** What the closed form guarantees. For each cell, Δ̂_ci at the threshold lies between its lowest possible value and D̂_max, and each cell is classed **certain-ok**, **certain-degenerate** or **undetermined**. A certain cell that comes out otherwise is a bug, not a finding.
+- **Secondary, a judgement.** Point predictions for the undetermined cells, using two stated heuristic factors. These are scored, but no pass or fail call about D-042, D-047 or the code rests on them.
+
+Every number is arithmetic on the region boxes, computed with `v_region.correction_term`, `v_region.region_from_matrices` and `elicited_region.v_box`; none comes from a run of arm (c). The Algorithm 2 code arm (c) will use (`src/conformal/adaptive.py`, commit 3f54b41) has so far been run only with zero-width boxes (step 6) and in two unit tests on artificial boxes: one checks only the optimistic variant's selected index, the other uses an off-diagonal mass of 9 per row. No region in this entry has been run.
+
+### Context
+
+D-042's "survives" verdicts, and every "ok" verdict in D-047, rested on `0 ≤ Δ̂_ci`. Equation (20) subtracts two width terms, so that lower bound fails once the box has width. This is recorded as a derivation error in the D-042 amendment of this date, which quotes equation (20) and the definitions of δ̂^(V)_k* and ζ̂^upp_k (JRSSB pp. 805 and 806) and gives a worked instance. Two checks confirmed it. A subagent working from the arXiv LaTeX source answered both questions the same way: Δ̂_ci can be negative, and the "ok" verdicts do not follow, while the robust degenerate ones do. Its report notes that it had read access to DECISIONS.md, which then held an earlier draft of this entry. Its derivation from the equations is its own, but it was not blind to this draft. The same error is now on the reversal scoreboard.
+
+**The closed-form bracket.** At t = S_(n_k), where F̂^k_k = 1:
+
+- term one of equation (20) is at most D̂_max = Σ_{l≠k} |V̂^upp_kl| and at least −P_k, where P_k = Σ_{l≠k} max(V̂^upp_kl, 0);
+- the second term subtracts at most (K − 1) δ̂^(V)_k*;
+- the third subtracts at most (K − 1) |ζ̂^upp_k|.
+
+So **Δ̂_min = −P_k − (K − 1)(δ̂^(V)_k* + |ζ̂^upp_k|) ≤ Δ̂_ci(S_(n_k)) ≤ D̂_max**, and the upper bound holds at every t. This gives:
+
+- **certain-degenerate** when `δ_ci − α > D̂_max`: no i satisfies equation (22);
+- **certain-ok** when `α − δ_ci ≥ −Δ̂_min`: i = n_k always satisfies it;
+- **undetermined** otherwise.
+
+**ζ̂^upp_k.** The paper defines ζ̂_k in equation (19) and ζ̂^upp_k as "a 1 − α_V upper confidence bound for ζ̂_k", which "can generally be extracted directly from [V̂^low, V̂^upp]" (p. 806). With α_V = 0 and V inside the box, every V̂^upp_kl − V_kl lies in [0, δ̂^(V)_kl], so ζ̂_k ≤ δ̂^(V)_k*. **Primary: ζ̂^upp_k = δ̂^(V)_k*,** the bound the box supports and the default in `adaptive.py`. **Sensitivity: ζ̂^upp_k = 0,** which the paper attains when the band is uniform (its randomised-response example). None of these boxes is uniform, so ζ̂ = 0 is not justified here. It is reported to show how much of the outcome rests on the third term.
+
+### 1. Run specification (fixed)
+
+- **Regions.** A and B from `region_from_matrices(REGION_A_MEASURED / REGION_B_MEASURED, NOISY_PRIOR)` (`c2-interface.md` §6). F1, F2, F3, L1 and R0 from `v_box(SCOPING_REGIONS[name], NOISY_PRIOR)` (D-047). α_V = 0, `V̄_upp` unused, ζ̂^upp_k = δ̂^(V)_k*. The whole run is repeated with ζ̂^upp_k = 0 and reported as a sensitivity; only the primary setting is scored.
+- **Synthetic truth per region**, chosen inside the region so that Theorem 4's premise holds. A and B use `T_HOC_FINE_TUNED`; F1 to R0 use the midpoint of the T-interval box. The generator's clean prior is the recovered `ρ = (Tᵀ)⁻¹ NOISY_PRIOR`, so the population proxy frequencies equal `NOISY_PRIOR`, the prior the boxes were built with. Checked now: every recovered prior is on the simplex and every true V lies inside its box.
+- **Harness as in steps 5 and 6.** Calibration counts 481 / 11,351 / 1,421 / 786; 100 repetitions; 20,000 test points; separability 2.0; base seed 0; prediction function D-048; conservative variant of record with the optimistic variant alongside (D-049). A 2 × 10⁶-point reference sample per region (seed base + 10⁶) for Δ_k and the assumption checks.
+- **Outcome definitions.** Condition k is *degenerate* in a run when τ̂_k = 1. A cell's outcome is **degenerate** if τ̂_k = 1 in at least 90 of 100 runs, **admissible** if τ̂_k < 1 in at least 90, and **split** otherwise. *Valid* means coverage against the clean label ≥ 0.90 − 3 SE.
+
+### 2. Prediction 1: admissibility at α = 0.10
+
+**Primary (closed form).** Under ζ̂ = δ̂*: 4 cells certain-degenerate (B bipolar, B schizophrenia, L1 bipolar, R0 bipolar), 1 certain-ok (A depression), 23 undetermined. Under ζ̂ = 0: B depression also becomes certain-ok, leaving 22 undetermined. The certain cells must hold in 100 of 100 runs. Any exception is an implementation error: stop, fix and re-run, and do not interpret.
+
+**Secondary (judgement).** For undetermined cells, predicted degenerate when `α − δ_ci + 0.5 D̂_max − P_k < 0.7 (K − 1)(δ̂* + ζ̂^upp)`. The factors encode an expectation about the synthetic scorer (separability 2.0): at the relevant thresholds, `|F̂^k_k − F̂^k_l|` should sit near 0.7, and term one near half its maximum. Confidence is **high** when the call is unchanged across factors in [0.4, 1.0] and term one anywhere in [0, D̂_max], and **low** otherwise. A-eating disorder is marked low because it clears that check by 0.0004. Under ζ̂ = 0 the only secondary call that changes is A-eating disorder, from degenerate to admissible.
+
+| region | condition | δ_ci | D̂_max | Δ̂_min, ζ̂ = δ̂* | **primary class** | Δ̂_min, ζ̂ = 0 | class, ζ̂ = 0 | D-042 / D-047 | secondary (judgement) | confidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | bipolar | 0.0919 | 0.0804 | -1.2344 | undetermined | -0.6172 | undetermined | ok | degenerate | high |
+| A | depression | 0.0084 | 0.0022 | -0.0257 | certain-ok | -0.0129 | certain-ok | ok | admissible | certain |
+| A | eating disorder | 0.0244 | 0.0046 | -0.2014 | undetermined | -0.1007 | undetermined | ok | degenerate | low |
+| A | schizophrenia | 0.0551 | 0.0262 | -0.6974 | undetermined | -0.3487 | undetermined | ok | degenerate | high |
+| B | bipolar | 0.2848 | 0.0804 | -3.9000 | certain-degenerate | -1.9500 | certain-degenerate | degenerate, robust | degenerate | certain |
+| B | depression | 0.0152 | 0.0022 | -0.1075 | undetermined | -0.0538 | certain-ok | ok | admissible | low |
+| B | eating disorder | 0.0506 | 0.0046 | -0.4863 | undetermined | -0.2432 | undetermined | ok | degenerate | high |
+| B | schizophrenia | 0.1524 | 0.0262 | -1.8403 | certain-degenerate | -0.9202 | certain-degenerate | degenerate, robust | degenerate | certain |
+| F1 | bipolar | 0.0647 | 0.0172 | -0.7667 | undetermined | -0.3919 | undetermined | ok | degenerate | high |
+| F1 | depression | 0.0411 | 0.0017 | -0.5662 | undetermined | -0.2840 | undetermined | ok | degenerate | high |
+| F1 | eating disorder | 0.0282 | 0.0042 | -0.2787 | undetermined | -0.1415 | undetermined | ok | degenerate | high |
+| F1 | schizophrenia | 0.0460 | 0.0106 | -0.5170 | undetermined | -0.2638 | undetermined | ok | degenerate | high |
+| F2 | bipolar | 0.0615 | 0.0115 | -0.7593 | undetermined | -0.3854 | undetermined | ok | degenerate | high |
+| F2 | depression | 0.0403 | 0.0023 | -0.5086 | undetermined | -0.2554 | undetermined | ok | degenerate | high |
+| F2 | eating disorder | 0.0289 | 0.0054 | -0.2814 | undetermined | -0.1434 | undetermined | ok | degenerate | high |
+| F2 | schizophrenia | 0.0467 | 0.0118 | -0.5204 | undetermined | -0.2661 | undetermined | ok | degenerate | high |
+| F3 | bipolar | 0.1026 | 0.0365 | -1.7534 | undetermined | -0.8950 | undetermined | degenerate, borderline | degenerate | high |
+| F3 | depression | 0.0411 | 0.0017 | -0.5662 | undetermined | -0.2840 | undetermined | ok | degenerate | high |
+| F3 | eating disorder | 0.0284 | 0.0046 | -0.2838 | undetermined | -0.1442 | undetermined | ok | degenerate | high |
+| F3 | schizophrenia | 0.0464 | 0.0113 | -0.5263 | undetermined | -0.2688 | undetermined | ok | degenerate | high |
+| L1 | bipolar | 0.3110 | 0.1360 | -7.2051 | certain-degenerate | -3.6706 | certain-degenerate | degenerate, robust | degenerate | certain |
+| L1 | depression | 0.0411 | 0.0017 | -0.5662 | undetermined | -0.2840 | undetermined | ok | degenerate | high |
+| L1 | eating disorder | 0.0291 | 0.0057 | -0.2984 | undetermined | -0.1521 | undetermined | ok | degenerate | high |
+| L1 | schizophrenia | 0.0477 | 0.0134 | -0.5536 | undetermined | -0.2835 | undetermined | ok | degenerate | high |
+| R0 | bipolar | 0.2457 | 0.0312 | -3.7034 | certain-degenerate | -1.8673 | certain-degenerate | degenerate, robust | degenerate | certain |
+| R0 | depression | 0.0781 | 0.0415 | -0.8758 | undetermined | -0.4586 | undetermined | ok | degenerate | high |
+| R0 | eating disorder | 0.0509 | 0.0321 | -0.6184 | undetermined | -0.3253 | undetermined | ok | degenerate | high |
+| R0 | schizophrenia | 0.1525 | 0.0886 | -2.6202 | undetermined | -1.3544 | undetermined | degenerate, borderline | degenerate | high |
+
+**Scoring.**
+
+- **Primary:** certain cells, as above.
+- **Secondary:** each undetermined cell is scored **held**, **falsified** (the opposite outcome) or **split**. High-confidence and low-confidence cells are reported separately.
+- **D-042 / D-047:** each of their "ok" cells is a direct test. It is **confirmed** if admissible and **overturned** if degenerate. This settles what the amendments left open.
+
+### 3. Prediction 2: the α at which each condition flips
+
+δ_ci does not depend on α (equation (21)).
+
+- **Primary (closed form).** The flip must lie in `[δ_ci − D̂_max, δ_ci − Δ̂_min]`. A measured flip outside that bracket is an implementation error.
+- **D-042's implied flip** is at or below δ_ci.
+- **Secondary (judgement).** Central `δ_ci − 0.5 D̂_max + P_k + 0.7 (K − 1)(δ̂* + ζ̂^upp)`. Low end: the same with 1.0 and 0.4 in place of 0.5 and 0.7.
+
+Values of 1 or more mean no α < 1 rescues the condition.
+
+| region | condition | guaranteed bracket, ζ̂ = δ̂* | D-042 implies | secondary central (low end), ζ̂ = δ̂* | secondary central, ζ̂ = 0 |
+|---|---|---|---|---|---|
+| A | bipolar | [0.011, 1.326] | ≤ 0.092 | 0.92 (≥ 0.51) | 0.48 |
+| A | depression | [0.006, 0.034] | ≤ 0.008 | 0.03 (≥ 0.02) | 0.02 |
+| A | eating disorder | [0.020, 0.226] | ≤ 0.024 | 0.16 (≥ 0.10) | 0.09 |
+| A | schizophrenia | [0.029, 0.752] | ≤ 0.055 | 0.53 (≥ 0.31) | 0.29 |
+| B | bipolar | [0.204, 4.185] | ≤ 0.285 | 2.97 (≥ 1.76) | 1.61 |
+| B | depression | [0.013, 0.123] | ≤ 0.015 | 0.09 (≥ 0.06) | 0.05 |
+| B | eating disorder | [0.046, 0.537] | ≤ 0.051 | 0.39 (≥ 0.24) | 0.22 |
+| B | schizophrenia | [0.126, 1.993] | ≤ 0.152 | 1.43 (≥ 0.86) | 0.78 |
+| F1 | bipolar | [0.047, 0.831] | ≤ 0.065 | 0.60 (≥ 0.36) | 0.34 |
+| F1 | depression | [0.039, 0.607] | ≤ 0.041 | 0.44 (≥ 0.27) | 0.24 |
+| F1 | eating disorder | [0.024, 0.307] | ≤ 0.028 | 0.22 (≥ 0.14) | 0.13 |
+| F1 | schizophrenia | [0.035, 0.563] | ≤ 0.046 | 0.41 (≥ 0.25) | 0.23 |
+| F2 | bipolar | [0.050, 0.821] | ≤ 0.062 | 0.59 (≥ 0.36) | 0.33 |
+| F2 | depression | [0.038, 0.549] | ≤ 0.040 | 0.40 (≥ 0.24) | 0.22 |
+| F2 | eating disorder | [0.023, 0.310] | ≤ 0.029 | 0.22 (≥ 0.14) | 0.13 |
+| F2 | schizophrenia | [0.035, 0.567] | ≤ 0.047 | 0.41 (≥ 0.25) | 0.23 |
+| F3 | bipolar | [0.066, 1.856] | ≤ 0.103 | 1.32 (≥ 0.79) | 0.72 |
+| F3 | depression | [0.039, 0.607] | ≤ 0.041 | 0.44 (≥ 0.27) | 0.24 |
+| F3 | eating disorder | [0.024, 0.312] | ≤ 0.028 | 0.23 (≥ 0.14) | 0.13 |
+| F3 | schizophrenia | [0.035, 0.573] | ≤ 0.046 | 0.41 (≥ 0.25) | 0.23 |
+| L1 | bipolar | [0.175, 7.516] | ≤ 0.311 | 5.33 (≥ 3.14) | 2.85 |
+| L1 | depression | [0.039, 0.607] | ≤ 0.041 | 0.44 (≥ 0.27) | 0.24 |
+| L1 | eating disorder | [0.023, 0.327] | ≤ 0.029 | 0.24 (≥ 0.15) | 0.13 |
+| L1 | schizophrenia | [0.034, 0.601] | ≤ 0.048 | 0.43 (≥ 0.26) | 0.24 |
+| R0 | bipolar | [0.214, 3.949] | ≤ 0.246 | 2.83 (≥ 1.71) | 1.55 |
+| R0 | depression | [0.037, 0.954] | ≤ 0.078 | 0.68 (≥ 0.41) | 0.39 |
+| R0 | eating disorder | [0.019, 0.669] | ≤ 0.051 | 0.48 (≥ 0.29) | 0.27 |
+| R0 | schizophrenia | [0.064, 2.773] | ≤ 0.152 | 1.97 (≥ 1.17) | 1.08 |
+
+**Measurement (step 9's sweep).** α ∈ {0.02, 0.05, 0.10, 0.15, 0.20, 0.30, 0.50, 0.75, 0.95}, 100 runs per α, primary ζ̂, conservative variant. The measured flip α̂_k is the smallest grid α at which τ̂_k < 1 in at least 50 runs, or "none".
+
+**Scoring, per cell.**
+
+- **Primary:** α̂_k is inside the guaranteed bracket, to the grid's resolution. Otherwise it is a bug.
+- **D-042 held:** α̂_k is at or below the first grid point ≥ δ_ci.
+- **Secondary held:** α̂_k is at or above the last grid point ≤ the low end.
+
+None of these can be rescued afterwards by moving the grid.
+
+### 4. Prediction 3: what the closed form cannot give
+
+**(a) Mean set size for truly bipolar test points, region A, conservative variant (secondary, a judgement: the closed form leaves bipolar, eating disorder and schizophrenia undetermined in region A, so it gives no size).** Predicted **3.1**; held if in [2.9, 3.3]. Reasoning: bipolar, eating disorder and schizophrenia are each predicted in every set under the secondary calls, and depression is admitted for a minority of bipolar posts. D-042's reading ("non-degenerate region A") implies at most about 1.6; a result at or below 1.6 confirms D-042 and falsifies this prediction. A result between 1.6 and 2.9 is "partly missed" and is reported per condition. Optimistic variant: predicted identical to arm (a), with thresholds equal in at least 95 of 100 runs for bipolar, eating disorder and schizophrenia.
+
+**(b) Sesia et al.'s Assumptions 2, 3 and 5**, measured on each region's reference sample, per condition (28 cells).
+
+- **Assumption 2** (densities of F̃^k_l bounded, and `f_min = min_k inf_{t∈(0,1)} f̃^k_k(t) > 0`). *Predicted:* the continuity and boundedness part holds. The `f_min > 0` part **fails** in every cell, because softmax scores have vanishing density as ŝ → 0 and ŝ → 1. *Operational test:* a 200-bin histogram of `ŝ(X, k)` given Ỹ = k on (0, 1); the part fails if the emptiest bin has density below 1% of the median bin.
+- **Assumption 3** (`max_{l≠k} F̃^k_l(t) ≤ F̃^k_k(t)` for all t). *Predicted:* **holds** in all 28 cells. *Test:* `sup_t [max_{l≠k} F̃^k_l(t) − F̃^k_k(t)] ≤ 0.005` over the reference sample's scores.
+- **Assumption 5** (equation (23)). As t → 0⁺, both CDFs in Δ_k vanish, so `inf_{t∈(0,1)} Δ_k(t) ≤ 0`, and Assumption 5 can hold only where the right-hand side of (23) is ≤ 0. Computed now, with the multiplier `1/√n* + √((log 2K + log n*)/2)` and the width term `(K − 1)(δ̂*_k + |ζ̂^upp_k|)` as printed, the right-hand side is positive in **27 of 28 cells**. The exception is region A depression, at −0.066; the next closest is region B depression at +0.023. Assumption 5 therefore fails in 27 cells by arithmetic. Under the ζ̂ = 0 sensitivity it fails in 26: region B depression drops to −0.031. *Predicted:* it holds in region A depression, where the test is `min_t Δ_dep(t) ≥ −0.066`. Consequence: Theorem 5's coverage upper bound, the guarantee that Algorithm 2 is not over-conservative, is unavailable everywhere except region A depression.
+
+**(c) The D-032 head-to-head at region A width**, run in two orientations. **O1:** truth `T_HOC_FINE_TUNED`, arm (b) given the cleanlab point. **O2:** truth `T_CLEANLAB`, arm (b) given the HOC point. In both, arm (c) is given the region A box. Scored on bipolar and schizophrenia (D-032), conservative variant of record.
+
+- **(c) WIN** for a condition: (c) is valid and not degenerate, and either (b) is invalid or (c)'s mean set size (over truly-k test points) is at least 0.05 below (b)'s.
+- **WIN BY ABSTENTION:** (c) is valid only because it is degenerate, and (b) is invalid. Recorded, **not** counted as a win.
+- **LOSS:** (b) is valid, and (c) is either invalid or at least 0.05 larger.
+- **TIE:** otherwise.
+- **The head-to-head is WON** only if (c) wins at least one of {bipolar, schizophrenia} in both orientations and loses neither.
+
+*Predicted:*
+
+- **O1:** (b) under-covers bipolar, because the cleanlab point overstates bipolar's inflow and over-corrects (low confidence), while (c) is degenerate. Result: win by abstention on bipolar and probably on schizophrenia.
+- **O2:** (b) is valid, because a point that understates the noise is conservative, as in step 6, while (c) is degenerate. Result: **loss** on both conditions.
+- **Overall:** the head-to-head is **not won**.
+
+### 5. Prediction 4: Proposition 3 and the optimistic variant (required by D-049)
+
+- **As stated:** fails in 100 of 100 runs in every cell. This is deterministic: the bound `δ_ci − (1 − α)/n_k` is positive in every cell, and `inf_t Δ_k ≤ 0`.
+- **At the realised threshold:** fails in at least 90 of 100 runs in every cell.
+- **Optimistic coverage:** nevertheless **valid** in every cell. Inflow into a label makes standard conformal conservative (Corollary 1), and the optimistic variant is predicted to reduce to standard conformal wherever the conservative one degenerates.
+- **Scoring:** a cell where the optimistic variant is invalid falsifies this prediction, and it also shows the unverifiable condition costing coverage, which D-049 asked to measure.
+
+### 6. What each outcome would mean for C2's scope
+
+- **F1 and F2 come out degenerate (secondary calls held): width, not mass, is binding.** Under the conservative Algorithm 2 at the C0 counts, any V-interval wider than roughly `(α − δ_ci)/(0.7 · 6) ≈ 0.01 to 0.02` in a rare condition's row degenerates that condition. An elicited region would have to be almost a point. That contradicts C2's premise of a region rather than a point, for the arm of record. C2 then reports D-032's characterisation branch with width as the binding axis. The ζ̂ = 0 sensitivity shows how much a structured, uniform region would recover. Any route forward (such a region, larger calibration sets, or the optimistic variant with its unverifiable condition) needs its own decision entry.
+- **F1 and F2 come out admissible (secondary calls falsified).** The width terms were small at the thresholds that matter. D-047's "ok" verdicts are confirmed in practice, though still not guaranteed by the closed form, and C2 proceeds as D-047 scoped it. Report the miss on the scoreboard.
+- **Split results.** Report per condition. C2's claim is restricted to the conditions that are admissible.
+- **Prediction 2.** Where α̂_k exceeds δ_ci, D-042's flip formula fails as a predictor of admissibility, though it still holds as a sufficient test for degeneracy. Where α̂_k is at or below δ_ci, the width terms were negligible there.
+- **Prediction 3(c), head-to-head not won.** As D-032 anticipated, the headline becomes the characterisation: where the coupling stops working, now with region width as a named cause. Won: C2 is a method at region A width, the stronger claim.
+- **Prediction 3(b).** Assumption 5 failing broadly is itself reportable: Algorithm 2 retains Theorem 4's validity but loses Theorem 5's tightness on this problem.
+
+### Evidence
+
+- Arithmetic from the functions named under Decision, run 2026-10-26 on `NOISY_PRIOR` and `CALIBRATION_COUNTS`, with `c(n_k)` from `expected_sup_deviation`.
+- Equations (20) to (25) and Assumptions 2 to 5 from Sesia et al. (2025), read in the local copy. Assumption 5 was cross-read in arXiv:2309.05092 v2, where it is numbered (24) and its asymptotic form (25).
+- The closed-form bracket follows from equation (20) with the CDFs in [0, 1]; the derivation is in Context.
+- The heuristic factors (0.7 on the width terms, 0.5 on term one) are a judgement from the synthetic scorer's construction, not a measurement. They drive only the secondary tier.
+- Independent check of equation (20): the subagent report summarised in Context, from the arXiv LaTeX source (labels `eq:delta-hat-k-epsilon-bound`, `eq:def-zeta-k`).
+
+### Consequences
+
+- Arm (c) runs only after this entry is committed. The tables above are the record the results are scored against.
+- D-042, D-047 and `c2-elicitation-scoping.md` §0 and §3 carry amendments of this date recording the derivation error. The run settles which of their "ok" verdicts hold in practice.
+- The reversal scoreboard gains one pre-registered prediction set, scored per section.
+
+### Links
+
+Tests D-042 and D-047. Implements roadmap step 7. Depends on D-028, D-029, D-031, D-032, D-048 and D-049. Results to D-046.
 
 ---
 
