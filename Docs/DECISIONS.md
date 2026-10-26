@@ -1880,7 +1880,7 @@ Applies D-019 and D-033.
 | 10 | Chapter 2 (Literature Review) draft | Next chapter | Soshan |
 | 11 | Re-verify novelty before camera-ready | D-017; the noisy-conformal area published 4+ items in 2024–25 | Soshan |
 | 12 | ~~One MentalRoBERTa fine-tune, identical protocol, splits and seed, reported as a Milestone 0 baseline replication (not a C1 arm)~~ **CLOSED 2026-09-27** (D-045): 0.8841 vs 0.8782 macro-F1, splits fingerprint-matched, MentalBERT retained | was D-011 | done |
-| 13 | Read the PDFs behind D-047: Zimmerman et al. (2010), Ernala et al. (2019) and Dagani et al. (2017), read so far only through a fetch tool, and Judd et al. (2002, 2003), Etchecopar-Etchart et al. (2021) and Hudson et al. (2007), not yet accessed | D-033 | Soshan |
+| 13 | Read the PDFs behind D-047. **Fetched sources checked 2026-10-26:** Zimmerman et al. (2010), Ernala et al. (2019) and Dagani et al. (2017), with Birnbaum et al. (2017), checked against their full texts (`Docs/clinical-elicitation-matrix.md`); every load-bearing claim supported. **Still unread:** Judd et al. (2002, 2003), Etchecopar-Etchart et al. (2021) and Hudson et al. (2007), not yet accessed | D-033 | Soshan |
 | 14 | Decide whether to elicit label PPVs directly (Sesia's direction) rather than T, and with what protocol | D-047, D-028 | Soshan + supervisor |
 
 ---
@@ -1949,6 +1949,10 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Zhu, Z., Wang, J. and Liu, Y. (2022) 'Beyond images: label noise transition matrix estimation for tasks with lower-quality features', ICML, PMLR 162 | Rescued the project. Evidence for D-030. |
 | Liu, Y., Cheng, H. and Zhang, K. (2023) 'Identifiability of label noise transition matrix', ICML, PMLR 202, 21475–21496 | Underpins D-018. Read in full 2026-08-09: it documents **four** identifiability routes, not three; the fourth (disentangled informative features, Theorem 5.5) prompted D-040. |
 | Ji, S., Zhang, T., Ansari, L., Fu, J., Tiwari, P. and Cambria, E. (2022) 'MentalBERT: publicly available pretrained language models for mental healthcare', LREC 2022, 7184–7190 | The encoder's provenance. Section 2.2 supplies the pretraining corpus for D-044; section 3.1 records that SWMH uses weak labels; section 6 states that the model predictions are not psychiatric diagnoses. Read in full 2026-08-18, correcting two prior claims (see the scoreboard). |
+| Zimmerman, M., Ruggero, C.J., Chelminski, I. and Young, D. (2010) 'Psychiatric diagnoses in patients previously overdiagnosed with bipolar disorder', *J Clin Psychiatry* 71(1), 26–31 | Load-bearing for D-047: the label PPV of 0.43 is derived from it. Claims checked against the full text in NotebookLM, 2026-10-26; all supported (`Docs/clinical-elicitation-matrix.md`, claims 1 to 8). |
+| Ernala, S.K. et al. (2019) 'Methodological gaps in predicting mental health states from social media: triangulating diagnostic signals', CHI 2019, 1–16, doi:10.1145/3290605.3300364 | D-047: 153 of 635 appraised genuine. Checked against the PDF in NotebookLM, 2026-10-26 (claims 14 to 16). Its "N = 146" is Birnbaum et al.'s set, not a second count. |
+| Birnbaum, M.L., Ernala, S.K., Rizvi, A.F., De Choudhury, M. and Kane, J.M. (2017) 'A collaborative approach to identifying social media markers of schizophrenia by employing machine learning and clinical appraisals', *JMIR* 19(8), e289 | D-047: 146 of 671 appraised genuine. Claim 10 checked in NotebookLM; claims 11 to 13 confirmed in the publisher's JATS XML (Methods, Clinician Appraisal), 2026-10-26. |
+| Dagani, J. et al. (2017) 'Meta-analysis of the interval between the onset and management of bipolar disorder', *Can J Psychiatry* 62(4), 247–258, doi:10.1177/0706743716656607 | Non-binding entry only (D-047). Checked against the PDF in NotebookLM, 2026-10-26 (claims 20 and 21). |
 
 ## Key references, cited but NOT yet read in full
 
@@ -1957,10 +1961,6 @@ The elicited set needs each range tied to a specific study. The *directions* are
 | Ding et al. (2023, NeurIPS), 'Class-conditional conformal prediction with many classes', arXiv:2306.09335 | One leg of C3's convergence table. |
 | Bortolotti et al. (2025), arXiv:2501.18060 | Bears on D-029. |
 | Einbinder et al. (2024), *JMLR* 25(328), 1–66 | Context-setting only; lower risk. |
-| Zimmerman et al. (2010), *J Clin Psychiatry*, 'Psychiatric diagnoses in patients previously overdiagnosed with bipolar disorder' | Load-bearing for D-047. Full text read only through a fetch tool; read the PDF and confirm volume and pages. |
-| Ernala et al. (2019), CHI | Full text read only through a fetch tool. The paper gives both 153 and 146 genuine self-reporters. |
-| Birnbaum et al. (2017), *JMIR* 19(8), e289 | Full text read through a fetch tool; open access, low cost to confirm. |
-| Dagani et al. (2017), *Can J Psychiatry* | Non-binding entry only. Fetch tool; confirm volume and pages. |
 | Zimmerman et al. (2008); Hirschfeld et al. (2003); Jagfeld et al. (2021) | Abstract only. Do not characterise beyond the abstract. |
 
 ---

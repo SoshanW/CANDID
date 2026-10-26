@@ -159,9 +159,12 @@ Sources located, what each measures, and how far it transfers:
 | Zimmerman, Ruggero, Chelminski and Young (2010) | 700 psychiatric outpatients (Rhode Island MIDAS project) interviewed with the SCID; asked whether previously diagnosed with bipolar disorder | 145 (20.7%) reported a prior diagnosis; 82 of those (56.6%) not confirmed by the SCID; 68 of the 82 (82.9%) had lifetime major depressive disorder; 90 patients received a SCID bipolar diagnosis | Full text on the publisher page, read through a fetch tool; figures quoted from its excerpts |
 | Zimmerman, Ruggero, Chelminski and Young (2008) | The same project's first report | "Fewer than half" of self-reported prior diagnoses confirmed | Abstract only |
 | Birnbaum, Ernala, Rizvi, De Choudhury and Kane (2017) | 671 randomly sampled Twitter users matching schizophrenia or psychosis self-disclosure phrases, appraised by clinicians | 146 genuine, 101 maybe, 424 not genuine (jokes, quotes); κ = 0.81 for genuine against not | Full text (JMIR, open access) |
-| Ernala et al. (2019) | Three proxy signals for schizophrenia on Twitter (affiliation with a support organisation's account, self-report phrases, clinician-appraised self-reports) against 88 clinically diagnosed patients | 153 of 635 self-reporters appraised genuine (the paper also gives N = 146 in one place); a model trained on the affiliation proxy scores AUC 0.95 internally and 0.20 on patients | Full text (authors' copy), read through a fetch tool |
+| Ernala et al. (2019) | Three proxy signals for schizophrenia on Twitter (affiliation with a support organisation's account, self-report phrases, clinician-appraised self-reports) against 88 clinically diagnosed patients | 153 of 635 self-reporters appraised genuine (the paper's N = 146 is Birnbaum et al.'s set); a model trained on the affiliation proxy scores AUC 0.95 internally and 0.20 on patients | Full text (authors' copy), read through a fetch tool |
 | Sekulić, Gjurković and Šnajder (2018) | Reddit users stating "I am diagnosed with bipolar" across five bipolar subreddits | 250 users checked, no false positives *as statements*; no subreddit PPV derivable | Full text (ACL Anthology) |
 | Jagfeld et al. (2021) | About 20,000 Reddit users self-reporting a bipolar diagnosis | "Often report additional mental health diagnoses" | Abstract only |
+
+The verified record of these sources, with a verdict per claim from the 2026-10-26 audit,
+is `Docs/clinical-elicitation-matrix.md`; the read status above is as of 2026-10-08.
 
 Derived from Zimmerman et al. (2010), not stated in it: of the 145 self-reports, 63 were
 confirmed (145 − 82), so the label's PPV in that clinic was **63 / 145 = 0.43**; and of
@@ -299,11 +302,11 @@ For the supervisor meeting, in the order they bear on C2's claim:
   boxing step remains.
 - **The closed world and Assumption 1** (§4; `c2-interface.md` §8).
 - **Source reading.** Zimmerman et al. (2010), Ernala et al. (2019) and Dagani et al.
-  (2017) were read as full-text web pages through a fetch tool that returns excerpts.
-  Under D-033 the PDFs should be read before any of their figures becomes
-  load-bearing in the thesis, and their volume and page numbers confirmed. Ernala et al.
-  (2019) moves from abstract-level to fetched full text; Hirschfeld et al. (2003) and
-  Zimmerman et al. (2008) remain abstract-only.
+  (2017) were first read as full-text web pages through a fetch tool that returns
+  excerpts. These, with Birnbaum et al. (2017), were checked against the full texts in
+  NotebookLM on 2026-10-26, and the volume and page numbers confirmed; every
+  load-bearing claim was supported (verdicts in `Docs/clinical-elicitation-matrix.md`).
+  Hirschfeld et al. (2003) and Zimmerman et al. (2008) remain abstract-only.
 
 ---
 
@@ -328,8 +331,8 @@ Research*, 19(8), e289.
 
 Dagani, J., Signorini, G., Nielssen, O., Bani, M., Pastore, A., de Girolamo, G. and
 Large, M. (2017) 'Meta-analysis of the interval between the onset and management of
-bipolar disorder', *Canadian Journal of Psychiatry*. doi:10.1177/0706743716656607.
-*Volume and pages to confirm.*
+bipolar disorder', *Canadian Journal of Psychiatry*, 62(4), pp. 247-258.
+doi:10.1177/0706743716656607.
 
 Ernala, S.K., Birnbaum, M.L., Candan, K.A., Rizvi, A.F., Sterling, W.A., Kane, J.M. and
 De Choudhury, M. (2019) 'Methodological gaps in predicting mental health states from
@@ -357,4 +360,4 @@ overdiagnosed?', *Journal of Clinical Psychiatry*. PMID 18466044. *Abstract only
 
 Zimmerman, M., Ruggero, C.J., Chelminski, I. and Young, D. (2010) 'Psychiatric
 diagnoses in patients previously overdiagnosed with bipolar disorder', *Journal of
-Clinical Psychiatry*. *Volume and pages to confirm.*
+Clinical Psychiatry*, 71(1), pp. 26-31.
