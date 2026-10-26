@@ -320,7 +320,7 @@ exactly, and the conservative variant differs from arm (a) by exactly the c(n_k)
 rank ⌈n_k(1 − α + c(n_k))⌉ against ⌈(n_k + 1)(1 − α)⌉. Either failing still means
 nothing downstream can be trusted.
 
-### Step 5 — Arm (a), noise-blind conformal
+### Step 5 — Arm (a), noise-blind conformal. ✅ DONE 2026-10-26
 
 Standard split conformal, **Mondrian / label-conditional** per D-029, at α = 0.1.
 Measure per-class coverage and mean set size.
@@ -332,6 +332,26 @@ Fix and record the prediction function here: Sesia's equation (3) is the plain
 threshold on π̂, their §4 uses the generalised inverse quantile scores of Romano,
 Sesia et al. (2020). Set sizes differ between them, so the choice must be recorded
 before the arms are compared.
+
+**Built.** Prediction function fixed by **D-048** (equation (3), score 1 − π̂,
+deterministic, empty sets reported). `src/conformal/split_conformal.py` (equation (4),
+Mondrian) and the harness `src/conformal/poc.py`, whose calibration sets take exactly
+the C0 test split's counts (481 / 11,351 / 1,421 / 786), the operating point of
+D-042's frontier. `python -m src.conformal.poc` reproduces the table below.
+
+**Gate: passed.** T = I, α = 0.10, 100 repetitions, 20,000 test points each,
+separability 2.0. Coverage against the clean label (mean ± SE over repetitions):
+
+| condition | coverage | mean set size | empty-set rate |
+|---|---|---|---|
+| bipolar | 0.8994 ± 0.0017 | 1.241 | 0.0011 |
+| depression | 0.9002 ± 0.0003 | 1.243 | 0.0010 |
+| eating disorder | 0.9003 ± 0.0010 | 1.242 | 0.0009 |
+| schizophrenia | 0.9000 ± 0.0015 | 1.242 | 0.0011 |
+
+Theory puts each mean in [0.900, 0.900 + 1/(n_k + 1)]; all four sit within one SE of
+it. The pinned test (`tests/test_conformal_split_conformal.py`) uses smaller counts and
+200 repetitions, with a tolerance of three SEs either side of that interval.
 
 ### Step 6 — Arm (b), Algorithm 2 with a plug-in point estimate
 
@@ -457,6 +477,8 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-26** — Step 5 done: arm (a) built under D-048; T = I gate passes (coverage
+  nominal for all four conditions). D-049 recorded; step 4's gate text corrected.
 - **2026-10-26** — Step 4 done: synthetic generator with known `T`; T = I gate and the
   ρ-recovery check pass (D-028 amendment; open item 3 stays open).
 - **2026-10-08** — Step 3b scoped (D-047): binding quantity identified as rare-label
