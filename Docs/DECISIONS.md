@@ -107,6 +107,7 @@ Entries D-001 to D-019 are **reconstructed retrospectively on 2026-07-17** and a
 | D-047 | Elicitation scoped against the budget: the binding quantity is label PPV, not misdiagnosis | ACTIVE | C2 |
 | D-048 | Prediction function for all three arms: Sesia's plain threshold, equation (3) | ACTIVE | C2 |
 | D-049 | Arm of record: the conservative Algorithm 2, with the optimistic variant reported alongside | ACTIVE | C2 |
+| D-050 | Pre-registration for step 9: an informativeness condition, the width and heterogeneity sweeps, at C0's separability | OPEN (pre-registration, awaiting review and commit) | C2 |
 ---
 
 # Part 1 · Scope and framing
@@ -2372,6 +2373,243 @@ The secondary calls assumed `|F̂^k_k − F̂^k_l| ≈ 0.7` at the threshold. In
 - Roadmap steps 7 and 8 are closed. Step 9's α sweep is done, and its width and heterogeneity sweeps wait for D-050.
 
 **Links.** Results of D-043. Tests D-042 and D-047 in practice. Bears on D-032, D-049 and D-050.
+
+---
+
+## D-050 · Pre-registration for step 9: an informativeness condition, the width and heterogeneity sweeps, at C0's separability
+**Date:** 2026-10-26 · **Status:** OPEN (pre-registration; becomes ACTIVE when committed, before either sweep runs) · **Category:** C2
+
+**Decision.** The following are fixed before either sweep runs:
+
+- the informativeness condition;
+- the separability pin;
+- both sweep designs;
+- the predictions and the branch rules.
+
+As in D-043, two kinds of prediction are kept apart:
+
+- **Certain:** closed-form arithmetic, or an identity in the code. A miss is a bug. Stop, fix, re-run every arm, and do not interpret.
+- **Judged:** scored, with stated confidence. D-046 showed that my judged calls on this machinery are unreliable: 15 of 23 admissibility calls were falsified. So few are made here, and none carries a pass or fail call about the code.
+
+**What exists so far:**
+
+- No sweep has been run.
+- The sweep designs were first written in the `src/conformal/sweeps.py` docstring, committed in cef9328 (not yet run). This entry supersedes that docstring and changes the design in four places, marked in §3 and §4.
+- The closed-form widths in §3 and the separability values in §2 come from arithmetic and from the generator alone. None comes from Algorithm 2 on a sweep draw.
+
+### Context
+
+**D-046 left informativeness unmeasured.** D-043 counted a cell as admissible whenever τ̂_k < 1. Arm (c)'s admissible cells still had mean set sizes up to 3.80 of 4. Arm (a), valid in every cell, had 1.33 to 1.88 (D-046 §2). The D-043 amendment records the gap.
+
+**D-046 ran a much weaker classifier than C0's.** Separability 2.0 was fixed in step 4 without reference to C0. Measured now under region A's truth with its recovered prior (n = 10⁶, seed 12345), against the proxy label:
+
+| | bipolar | depression | eating disorder | schizophrenia | macro-F1 |
+|---|---|---|---|---|---|
+| synthetic, separability 2.0 | 0.464 | 0.893 | 0.688 | 0.560 | 0.652 |
+| C0 test set (`Docs/baseline-results.md` §3, D-011) | 0.7516 | 0.9787 | 0.9451 | 0.8372 | 0.8782 |
+
+- Set size depends on separability, so D-046's sizes describe a classifier far weaker than C0's.
+- D-046's coverage results and closed-form checks do not depend on separability in this way.
+- No number in D-046 changes.
+
+**Arm (a) is expected to stay valid in this generator.**
+
+- The generator satisfies Assumption 1 by construction.
+- A true condition's logit is shifted up by a positive margin.
+- So, among points with proxy label k, those not truly k have stochastically larger arm (a) scores than those that are. In that situation `c2-interface.md` §3 derives arm (a) as conservative.
+- Assumption 3 held in all 28 D-046 cells.
+
+This bounds what the sweeps can show (see Limitations).
+
+### 1. The informativeness condition (Soshan's criterion, operationalised)
+
+**Criterion, verbatim:** "arm (c) is informative for a condition only if its mean set size and full-set rate are no worse than arm (a)'s on the same data, with arm (a)'s validity reported alongside."
+
+**Operationalisation.** Take condition k at one sweep point and one separability setting, with both arms run on the same 100 draws.
+
+1. On each run, take arm (c) minus arm (a), over the truly-k test points, for both the mean set size and the full-set rate.
+2. Average these over the 100 runs to get ΔS_k (size) and ΔF_k (full-set rate).
+
+Arm (c) **meets the condition** for k when both of these hold:
+
+- ΔS_k ≤ +0.05, the size margin D-043 §4(c) already uses for WIN and LOSS;
+- ΔF_k ≤ +0.01, an absolute margin.
+
+Otherwise it **fails** the condition. It also fails automatically when τ̂_k = 1 in at least 50 runs.
+
+- **It is a necessary condition, not a sufficient one.** The criterion says "only if". Meeting it is reported as "meets D-050's informativeness condition", never as "informative" without qualification.
+- **What every cell reports alongside:**
+  - arm (a)'s coverage ± SE and its validity under D-043 §1's rule (coverage ≥ 0.90 − 3 SE);
+  - arm (c)'s coverage ± SE and its validity;
+  - both sizes and both full-set rates;
+  - ΔS_k and ΔF_k;
+  - the degenerate-run count.
+- **A separately named outcome: "valid where arm (a) is not."** This is arm (c) valid, arm (a) invalid, and the condition failed. It does not count as meeting the condition, because the comparison is then against a set that under-covers.
+- **Variant scored:** the conservative variant (D-049), with primary ζ̂ = δ̂*. The optimistic variant is reported alongside and not scored: in D-046 it equalled arm (a) on every run, so it would meet the condition trivially.
+
+### 2. Separability, pinned to C0's per-condition F1
+
+**Generator change, made after this commit.**
+
+- `separability` may be a length-K vector, and truly-k points get logit margin s_k.
+- A scalar keeps its current meaning, so every existing pin is unchanged.
+
+**Target.** C0's per-condition test F1: 0.7516, 0.9787, 0.9451 and 0.8372 for bipolar, depression, eating disorder and schizophrenia.
+
+- It is measured against the proxy label, since that is what C0 measured.
+- The prediction is the argmax of the scores.
+- It is measured under the sweep's own truth, with its recovered prior (the D-043 convention).
+
+**Solver (fixed).**
+
+- **Sample:** one sample of n = 10⁶, seed 12345. It draws, in order: clean labels, then the n × K standard-normal logits, then the uniforms for the proxy label.
+- **Search:** coordinate bisection over s_k ∈ [0, 30], in condition order.
+- **Settings:** 30 halvings per coordinate, 8 passes, starting from s = 2.0 for every k.
+
+**Values.** Computed for this entry; a test pins them when they are implemented.
+
+| sweep truth | s (bipolar, depression, eating disorder, schizophrenia) | attained proxy F1 | macro-F1 |
+|---|---|---|---|
+| region A's truth, `normalised(T_HOC_FINE_TUNED)` | 2.156, 3.176, 30.000, 2.435 | 0.7516, 0.9787, **0.9354**, 0.8372 | 0.8757 |
+| T_0 (heterogeneity h = 0) | 1.640, 4.049, 30.000, 2.316 | 0.7516, 0.9787, **0.9073**, 0.8372 | 0.8687 |
+
+**Eating disorder's target is unreachable in this generator.**
+
+- At s_ED = 30, eating-disorder F1 is capped at 0.935 and 0.907.
+- Two things cap it: other conditions' points cross into the eating-disorder argmax, and under T_0 the label noise adds a further cap.
+- The pin uses s_ED = 30, and the shortfall is a limitation.
+
+**Reproduction check.** The implementation must reproduce these values to three decimals. If it does not, stop and report before any sweep runs.
+
+**s is held fixed within a sweep.**
+
+- Across widths, s stays at the width sweep's value.
+- Across h, s stays at T_0's value.
+- The F1 attained at each h is reported, not re-pinned. A pre-run check with an earlier, unconverged s showed bipolar F1 drifting from 0.75 to 0.72 by h = 0.9.
+
+**Reference setting.** Every sweep is also run at the scalar 2.0, for continuity with D-046. These runs are reported but **not scored**.
+
+### 3. Width sweep
+
+**Design.**
+
+- **Truth:** `normalised(T_HOC_FINE_TUNED)`, region A's truth. *Change from the docstring*, which passed the un-normalised matrix; D-046 Context gives the reason.
+- **Prior:** the clean prior is the one recovered from the truth. V is built from `NOISY_PRIOR`, as in D-043.
+- **Box:** `V_low = V − w`, `V_upp = V` on the off-diagonals, for w ∈ {0, 0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.5}. Every true off-diagonal is negative, so P_k = 0.
+- **Algorithm settings:** conservative variant, primary ζ̂, α = 0.10.
+- **Harness:** D-043 §1's, which is 100 runs, base seed 0, calibration counts 481 / 11,351 / 1,421 / 786, and 20,000 test points. The same draws are used at every width.
+- **Measured per (w, k):** the degenerate-run count and every §1 quantity.
+- **Measured per k:**
+  - w*_k, the smallest grid w with τ̂_k = 1 in at least 50 runs (unchanged from the docstring);
+  - **w_inf,k**, the largest grid w at which the §1 condition is met at that w and at every smaller grid w, or "none" if it fails at w = 0. *New.*
+
+**Closed-form widths.** Computed with `sweeps.closed_form_widths`, previewed on a 10⁻⁴ grid; the run recomputes them on the 10⁻⁵ grid.
+
+| condition | largest certain-ok w | smallest certain-degenerate w | D-042 frontier (δ_ci = α) |
+|---|---|---|---|
+| bipolar | 0.0085 | 0.2408 | 0.0993 |
+| depression | 0.0142 | 0.1689 | 0.1650 |
+| eating disorder | 0.0125 | 0.1535 | 0.1454 |
+| schizophrenia | 0.0110 | 0.1744 | 0.1282 |
+
+**Predictions.**
+
+- **W1 (certain).** Separability does not enter the closed form, so this holds at both separability settings. It is scored on every grid width that falls in a bracket.
+  - τ̂_k < 1 in 100 of 100 runs at w ∈ {0, 0.001, 0.002, 0.005} for all four conditions, and at w = 0.01 for depression, eating disorder and schizophrenia.
+  - τ̂_k = 1 in 100 of 100 runs at w ∈ {0.2, 0.5} for depression, eating disorder and schizophrenia, and at w = 0.5 for bipolar.
+- **W2 (judged, high).** Arm (a) is valid for all four conditions at both separability settings. Arm (a) does not see the box, so this is one measurement per condition per setting.
+- **W3 (judged, high).** At the pinned separability, arm (a)'s bipolar coverage is at least 0.956, its D-046 value at separability 2.0. Arm (a) over-covers because about 8% of bipolar-labelled points are not truly bipolar, and a sharper classifier pushes their scores further above the truly-bipolar ones.
+- **W4 (judged, high).** The degenerate-run count is non-decreasing in w for every condition. This is judged rather than certain, because I have not shown that every term of equation (20) is monotone under box nesting.
+- **W5 (judged, medium).** At the pinned separability:
+  - **Bipolar** meets the condition at w = 0 and w = 0.001, and fails it at every w ≥ 0.01. So 0.001 ≤ w_inf,bipolar < 0.01.
+  - **Basis:** W3. Arm (a) over-covers bipolar by about 0.05, while arm (c) at w = 0 targets roughly 0.93. Step 6's oracle conservative value was 0.927.
+  - **No call** is made for depression, eating disorder or schizophrenia. Arm (a) sits near 0.90 to 0.92 for them, and the outcome turns on size differences smaller than I can predict.
+- **W6 (judged, medium).** No condition meets the condition at any w ≥ 0.05, at either separability setting.
+
+### 4. Heterogeneity sweep (D-032)
+
+**Design.**
+
+- **Truth T_h,** unchanged from the docstring:
+  - `T[bipolar, depression] = 0.10 (1 + h)`;
+  - `T[eating disorder, depression] = 0.10 (1 − h)`;
+  - `T[schizophrenia, depression] = 0.10 (1 + h/2)`;
+  - depression sends 0.002 to each rare label;
+  - h ∈ {0, 0.25, 0.5, 0.75, 0.9}.
+- **Arms:**
+  - arm (b) gets the point T_0;
+  - arm (c) gets `region_from_matrices([T_0, T_h], NOISY_PRIOR)`;
+  - **arm (a) is added.** *Change from the docstring.*
+- **Settings:** conservative variant, primary ζ̂, D-043 §1's harness and seeds, at both separability settings.
+- **Scoring:**
+  - D-043 §4(c)'s verdicts (WIN, WIN BY ABSTENTION, LOSS, TIE) on bipolar and schizophrenia, as in the docstring;
+  - **the §1 condition on all four conditions**, with every §1 quantity reported. *Change from the docstring.*
+
+**Predictions.**
+
+- **H1 (certain).** At h = 0 the box is the single point T_0. Arm (c)'s thresholds therefore equal arm (b)'s on every run, for every condition: both go through the same `calibrations` call with `V_low = V_upp = V(T_0)`. The D-043 verdict at h = 0 is TIE.
+- **H2 (judged, high).** Arm (a) is valid at every h, for every condition, at both separability settings. The basis is in Context: T_h changes only the outflow from the rare labels, and the inflow into them is fixed.
+- **H3 (judged, medium-high).** Arm (b) is valid for bipolar and schizophrenia at every h. T_0 understates their outflow to depression, and step 6 found that a misstated outflow did no harm.
+- **H4 (judged, medium-high).** For bipolar and schizophrenia at h > 0:
+  - **No WIN or WIN BY ABSTENTION.** With arm (b) valid (H3), those verdicts need arm (c)'s sets to be smaller than arm (b)'s, and arm (c)'s box contains arm (b)'s point.
+  - **LOSS** for both conditions at every h ≥ 0.5.
+
+### 5. Branch rules
+
+Bipolar's results at the pinned separability decide C2's claim.
+
+1. **w_inf,bipolar ≥ 0.001.**
+   - C2's claim for bipolar becomes conditional. The region-fed conservative Algorithm 2 meets the informativeness condition against noise-blind conformal when the elicited box is no wider than w_inf.
+   - w_inf becomes the precision target for D-047's elicitation, set against the widths F1, F2 and F3 actually have. Those widths are recorded with the result, not predicted here.
+2. **The condition is met at w = 0 only.**
+   - Knowing the noise exactly buys smaller valid sets, but any tested nonzero width erases the gain at n = 481.
+   - C2 becomes a characterisation result: a measured boundary, with no regime of benefit for a region-fed method.
+3. **The condition fails even at w = 0.**
+   - The conservative variant's finite-sample margin alone outweighs the noise correction at C0's separability.
+   - C2's claim reduces to validity under a misstated point, which is D-046's O1 result.
+   - Any other variant needs its own entry.
+4. **Arm (a) is invalid anywhere in either sweep,** contrary to W2 and H2.
+   - The generator then reaches the regime C2's validity argument is built for. Those cells are reported first.
+   - "Valid where arm (a) is not" is the headline for those cells.
+5. **Arm (a) is valid everywhere,** as predicted.
+   - The record states that, in a generator satisfying Assumption 1 with ordered scores, no tested setting makes noise-blind conformal under-cover.
+   - So C2's validity advantage can only be shown against a misstated point (arm (b)), not against arm (a).
+   - Testing arm (a) where it fails needs a generator that violates that ordering. That is a separate design and a separate entry.
+
+**Other conditions.** The other three conditions' w_inf values are reported per condition, and they restrict the claim per condition, as D-043 §6's "split" branch does.
+
+**The 2.0 runs** are reported only to show how much of D-046 was due to separability.
+
+### Limitations, recorded before the run
+
+- **The generator satisfies Assumption 1 and its scores are ordered.** If W2 and H2 hold, neither sweep can show arm (c) rescuing validity from arm (a).
+- **The separability pin is partial.** Eating disorder's F1 target cannot be reached. Pinning to proxy-label F1 also mixes classifier skill with label noise, as C0's F1 does.
+- **The width sweep is narrow:** one truth, one box shape (the truth at the box's upper end) and one sample-size profile.
+- **The margins are choices made in this entry:** 0.05 for size and 0.01 for full-set rate.
+- **The criterion is relative to arm (a).** It does not ask whether any method's sets are clinically usable.
+- **Synthetic only.** Nothing here transfers to the real scores until the POC passes (roadmap §5).
+
+### Evidence
+
+- C0's figures: `Docs/baseline-results.md` §3.
+- Closed-form widths: `sweeps.closed_form_widths`, commit cef9328.
+- Separability values: the solver in §2, to be committed with the implementation and its pinning test.
+
+### Consequences
+
+Once this entry is committed:
+
+1. Implement the per-condition separability, the separability solver, and the §3 and §4 changes in `sweeps.py`. Add tests pinning the §2 values and the §3 table.
+2. Run both sweeps.
+3. Write the result as D-051, quoting these predictions verbatim.
+
+Roadmap step 9 closes with D-051.
+
+### Links
+
+- Closes the gap recorded under D-043.
+- Bears on D-032, D-046, D-047 and D-049.
+- The separability target comes from D-011.
 
 ---
 
