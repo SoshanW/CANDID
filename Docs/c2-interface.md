@@ -2,7 +2,8 @@
 
 _Date: 2026-08-14. Source read in full: Sesia, M., Wang, Y.X.R. and Tong, X. (2025)
 'Adaptive conformal classification with noisy labels', JRSSB 87(3), 796–815,
-doi:10.1093/jrsssb/qkae114. Local copy: `D:\Uni\Papers\Top 15`._
+doi:10.1093/jrsssb/qkae114. Local copy: `D:\Uni\4th Year\Docsc for CANDID\Papers\Top 15`
+(path updated 2026-10-26; previously `D:\Uni\Papers\Top 15`)._
 
 _This document answers step 1 of the C2 proof-of-concept
 (`progress-and-roadmap.md` §5): the exact input signature of Algorithm 2, the
@@ -254,7 +255,7 @@ degeneracy but says nothing about set sizes in the non-degenerate region, and Th
 - **The supplementary material was not held when §1 to §7 were written, and has since
   been located.** Sections S3 (special cases including the randomised response model,
   and the form of V̄_upp), S4 (Algorithms S2 and S3) and S5 are referenced throughout
-  and are absent from the JRSSB article PDF in `D:\Uni\Papers\Top 15`. They are
+  and are absent from the JRSSB article PDF in `D:\Uni\4th Year\Docsc for CANDID\Papers\Top 15`. They are
   included in the arXiv preprint, **arXiv:2309.05092**, which runs to 127 pages with
   all appendices (`https://arxiv.org/pdf/2309.05092`). Note that the arXiv v2 is dated
   February 2024 and the JRSSB version was accepted in November 2024, so section

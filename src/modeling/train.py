@@ -2,8 +2,8 @@
 
 Single responsibility: wire the data layer -> author-grouped splits -> tokenized
 datasets -> a HF ``Trainer`` fine-tune, then persist the splits and the trained
-checkpoint. This is baseline #1 from Docs/technical-contribution-in-depth.md
-(naive fine-tune on clean-assumed proxy labels); noise modeling / calibration /
+checkpoint. This is the C0 baseline, D-011 (naive fine-tune on clean-assumed proxy
+labels; results in Docs/baseline-results.md); noise modeling / calibration /
 abstention are separate future increments.
 
 Run (local, Windows)::

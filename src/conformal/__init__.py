@@ -19,6 +19,27 @@ from src.conformal.v_region import (
     region_from_matrices,
     transition_to_v,
 )
+from src.conformal.adaptive import (
+    AdaptiveCalibration,
+    InflationReference,
+    adaptive_thresholds,
+    proposition_three_check,
+    zero_width_box,
+)
+from src.conformal.split_conformal import (
+    SetMetrics,
+    evaluate_sets,
+    nonconformity_scores,
+    predict_sets,
+    standard_thresholds,
+)
+from src.conformal.synthetic import (
+    SyntheticConfig,
+    SyntheticSample,
+    generate,
+    make_transition,
+    recover_clean_prior,
+)
 
 __all__ = [
     "ConditionBudget",
@@ -28,4 +49,19 @@ __all__ = [
     "max_admissible_offdiagonal_mass",
     "region_from_matrices",
     "transition_to_v",
+    "SyntheticConfig",
+    "SyntheticSample",
+    "generate",
+    "make_transition",
+    "recover_clean_prior",
+    "SetMetrics",
+    "evaluate_sets",
+    "nonconformity_scores",
+    "predict_sets",
+    "standard_thresholds",
+    "AdaptiveCalibration",
+    "InflationReference",
+    "adaptive_thresholds",
+    "proposition_three_check",
+    "zero_width_box",
 ]

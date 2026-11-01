@@ -1,6 +1,6 @@
 # Project Progress & Roadmap — resume-from-here reference
 
-_Last updated: 2026-10-01. This is the single "where are we / what's next" document.
+_Last updated: 2026-10-08. This is the single "where are we / what's next" document.
 Read §0, then jump to §5 "Next action when you resume."_
 
 _Authority note: `Docs/DECISIONS.md` is the authoritative record for every claim and
@@ -26,14 +26,35 @@ DECISIONS.md wins._
   **3.6 times wider** than Sesia's Algorithm 2 can absorb.
 - **C2 (noise-coupled calibrated abstention) is BARELY STARTED.** `src/conformal/`
   holds the input side (the T → V conversion and the closed-form degeneracy test,
-  D-042). There is still no conformal calibration, no abstention, and no elicited
-  region. **C2's actual claim has not been tested.**
+  D-042) and, since 2026-10-26, the POC harness: synthetic generator, arm (a), and a
+  port of Algorithm 2 (arm (b)) in both variants (D-048, D-049). There is still no
+  elicited region and no arm (c). **C2's actual claim has not been tested.**
 - **C3 (shift evaluation) has NOT STARTED.** DAIC-WoZ loads (188 participants) but is
   not wired into any evaluation.
-- **Immediately next:** §5 step 3b, **scoping the clinical elicitation against a
-  numeric budget**. The elicited region's off-diagonal mass must stay under 0.378 for
-  bipolar at α = 0.10. That is where C2's contribution begins, and it is now the
-  critical path. The simulation arms (steps 4 to 10) follow it, not the reverse.
+- **Step 3b (elicitation scoping) is DONE as a derivation (D-047, 2026-10-08).** The
+  budget binds on posts *entering* the rare labels, not on misdiagnosis: bipolar needs a
+  worst-case PPV of about **0.78** for r/bipolarreddit (depression → bipolar near 1% or
+  less). The closest measured analogues sit at 0.22 to 0.43, and no subreddit-level
+  study exists. Projected: bipolar inadmissible at the C0 operating point, depression and
+  eating disorder admissible, schizophrenia open. Full record:
+  `Docs/c2-elicitation-scoping.md`.
+- **§5 steps 4 to 6 are DONE (2026-10-26).** Every gate passed. In step 6's configuration
+  (outflow from bipolar only) the wrong point estimate did **not** break coverage, as
+  expected before the run and against the roadmap's original expectation, and the
+  optimistic variant reduced exactly to arm (a).
+- **§5 steps 7 and 8 are DONE (2026-10-26).** D-043 was committed before the run, and
+  D-046 records the result.
+  - **Held:** every closed-form guarantee, with no implementation error. The
+    head-to-head was **not won**, as predicted.
+  - **Failed:** the judged predictions mostly. Arm (c) avoided "always flag" more often
+    than predicted, but its sets were larger than noise-blind arm (a)'s in every cell
+    (about 3.6 of 4 conditions in F1 and F2).
+  - **Not measured:** informativeness. D-043 did not pre-register it, so it is not
+    established.
+- **Immediately next:** review and commit D-046, then D-050, which pre-registers the
+  informativeness criterion, the width and heterogeneity sweeps (step 9), and a
+  separability pinned to C0's per-condition F1. Take D-046 to the supervisor with open
+  items 3, 5 and 14.
 
 ---
 
@@ -42,8 +63,12 @@ DECISIONS.md wins._
 Multi-condition mental-health screening from text, studying **proxy-label noise**
 (Reddit "subreddit = diagnosis" is a noisy label) and **calibrated abstention** (the
 model should refuse to answer when unsure), evaluated under a **Reddit → clinical
-distribution shift**. Downstream model: **MentalBERT**. Full technical framing lives
-in `Docs/technical-contribution-in-depth.md`.
+distribution shift**. Downstream model: **MentalBERT**. The technical framing is
+split by contribution: C1 in `Docs/contribution-1.md` (why C1 became a diagnostic,
+D-030) and `Docs/c1-noise-design.md` (the pre-D-030 estimator design); C2 in
+`Docs/c2-interface.md` and `Docs/c2-elicitation-scoping.md`; C3 and the evaluation
+design in D-032 and §7 below. (`technical-contribution-in-depth.md` was removed in
+94c031d.)
 
 Three datasets:
 - **Low et al.** (Reddit, Zenodo 3941387) — per-post, subreddit = proxy label.
@@ -59,7 +84,7 @@ Three datasets:
 |---|---|---|---|
 | **C0 — baseline** | Naive MentalBERT multi-class fine-tune on proxy labels; raw softmax confidence | **DONE** 2026-07-07; encoder replication 2026-09-27 | `Docs/baseline-results.md`, D-045 |
 | **C1 — noise-estimator diagnostic** | Run HOC + cleanlab on the real data and measure whether the no-clean-data estimators are usable | **COMPLETE** 2026-08-09 | D-034, D-036, D-037, D-038, D-039, D-040, D-041 |
-| **C2 — noise-coupled calibrated abstention** | Sesia's Algorithm 2 fed a clinically elicited *region* rather than a point estimate | **INPUT SIDE ONLY** (D-042); the claim itself untested | design in D-027, D-028, D-029, D-031, D-032 |
+| **C2 — noise-coupled calibrated abstention** | Sesia's Algorithm 2 fed a clinically elicited *region* rather than a point estimate | **INPUT SIDE ONLY** (D-042); elicitation scoped against the budget (D-047); the claim itself untested | design in D-027, D-028, D-029, D-031, D-032, D-047 |
 | **C3 — identifiability-under-shift eval** | Synthetic recovery test, per-condition degradation curves, Reddit → DAIC shift | **NOT STARTED** | design in D-032 |
 | Optional — symptom-alignment signal | Per-post DSM-5/ICD-11 symptom-match score | dropped unless time permits | — |
 
@@ -104,6 +129,7 @@ locally and on Colab: `config.py`, `labels.py`, `splits.py`, `dataset.py`,
 |---|---|
 | `v_region.py` | T → M → V conversion, the containment region, and the closed-form degeneracy test |
 | `c1_matrices.py` | C1's transition matrices transcribed from DECISIONS.md; the two constructed ones flagged in their docstrings |
+| `elicited_region.py` | an elicited T-box propagated to Sesia's V-box, the degeneracy test on it, worst-case label PPV, and the constructed scoping regions of D-047 |
 | `__main__.py` | `python -m src.conformal` reproduces every table in `Docs/c2-interface.md` §6 |
 
 **Not built:** the conformal calibration itself (arms a, b, c), the synthetic
@@ -242,29 +268,73 @@ calibration fraction) for Chapter 4. The numbers exist; the figure does not.
 
 This is D-032's sweep and it no longer needs a simulation to produce its main curve.
 
-### Step 3b — Scope the elicitation against the budget (open item 6)
+### Step 3b — Scope the elicitation against the budget (open item 6). ✅ SCOPED 2026-10-08
 
 **This is where C2's actual contribution starts, and it is now the critical path.**
 Nothing before this step tests C2's claim. The question is whether a defensible reading
 of the clinical literature yields a region whose off-diagonal mass fits under 0.378 for
 bipolar.
 
+**Result (D-047, `Docs/c2-elicitation-scoping.md`).** A region can fit all four budgets,
+but the binding entries are not the ones open item 6 listed. Bipolar's row of V is
+built from posts carrying the bipolar label, so bipolar → depression leakage is
+invisible to it and affordable up to about 60%. What exhausts it is inflow: depression →
+bipolar near 1%, equivalently a worst-case PPV for r/bipolarreddit below about 0.78.
+
+| Region (constructed) | Depression → bipolar | Bipolar mass (budget 0.378) | Verdict | Worst-case bipolar PPV |
+|---|---|---|---|---|
+| F1 | ≤ 0.5% | 0.192 | ok | 0.873 |
+| F3 | ≤ 1% | 0.392 | degenerate, borderline | 0.763 |
+| L1 | ≤ 2.4% | 1.492 | degenerate, robust | 0.450 |
+
+The closest measured PPVs are 0.43 (a self-reported prior bipolar diagnosis in an
+outpatient clinic) and 0.22 to 0.24 (schizophrenia self-disclosure on Twitter). No study
+measures subreddit PPV. The literature-leaning region L1 fails by a factor similar to
+C1's region B (1.49 against 1.354). **Projected:** bipolar inadmissible at the C0
+operating point, depression and eating disorder admissible, schizophrenia open.
+
+What can still move it, for the supervisor meeting: a structured elicitation of label
+PPVs (a direction change from D-028, open item 14); a descriptive audit of carer and
+"am I bipolar" posts and of author cross-posting; the α and calibration share (the 0.43
+clinic figure is admissible only near α = 0.20 with a 20% share); or reporting
+per-condition admissibility as the C2 result under D-032.
+
 D-031 interacts directly: not pruning keeps deterministic containment and α_V = 0, but
 it also keeps the region wide, and width is exactly what the budget constrains. That
 trade is no longer abstract and should be settled with the supervisor with these
-numbers in hand.
+numbers in hand. **D-047 adds one fact:** pruning cannot rescue bipolar, because the
+budget is exhausted near 1% depression → bipolar and the simplex ceiling sits near 4.7%,
+so D-031 can be decided on its other merits.
 
-### Step 4 — Synthetic generator with a known `T`
+### Step 4 — Synthetic generator with a known `T`. ✅ DONE 2026-10-26
 
 New `src/conformal/synthetic.py`. Draw a K = 4 problem at this project's real
 prevalences (roughly 0.81 / 0.10 / 0.06 / 0.04), a controllable true `T` with
 bipolar → depression as the dominant off-diagonal, and a scorer that emits softmax-like
 probabilities with a tunable separability parameter. Corrupt labels through `T`.
 
-**Sanity gate:** with `T = I`, all three arms must coincide. That identity check is the
-POC's own unit test — if it fails, nothing downstream means anything.
+**Built.** Clean prior `NOISY_PRIOR`; `make_transition(bipolar_to_depression,
+background)`; scores are a softmax of `separability · onehot(Y)` plus standard normal
+noise; labels corrupted through `T` independently of the scores, so Sesia's Assumption 1
+holds by construction. Seeded; `python -m src.conformal.synthetic` prints a summary.
+`tests/test_conformal_synthetic.py`, 11 tests.
 
-### Step 5 — Arm (a), noise-blind conformal
+**Gates.** With `T = I` the proxy labels equal the clean labels on 100,000 draws. The
+recovered clean prior `ρ = (Tᵀ)⁻¹ρ̃` lands within four standard errors of the truth for
+three matrices at n = 10⁶, and across 200 seeds its z-scores have mean ≈ 0 and SD ≈ 1.
+Recorded as a numerical check on D-028 (amendment) bearing on open item 3, which stays
+open. The arm-side half of the sanity gate needs steps 5 and 6.
+
+**Sanity gate (corrected 2026-10-26, D-049).** The original text read "with `T = I`, all
+three arms must coincide". That is false for the conservative Algorithm 2: with V = I
+the noise terms vanish but δ keeps the constant c(n_k), so its threshold sits above
+standard conformal's (bipolar at n = 481: rank 447 against 434). The gate is now two
+tests at `T = I`: the optimistic variant (equations (18) and (25)) equals arm (a)
+exactly, and the conservative variant differs from arm (a) by exactly the c(n_k) shift,
+rank ⌈n_k(1 − α + c(n_k))⌉ against ⌈(n_k + 1)(1 − α)⌉. Either failing still means
+nothing downstream can be trusted.
+
+### Step 5 — Arm (a), noise-blind conformal. ✅ DONE 2026-10-26
 
 Standard split conformal, **Mondrian / label-conditional** per D-029, at α = 0.1.
 Measure per-class coverage and mean set size.
@@ -277,7 +347,27 @@ threshold on π̂, their §4 uses the generalised inverse quantile scores of Rom
 Sesia et al. (2020). Set sizes differ between them, so the choice must be recorded
 before the arms are compared.
 
-### Step 6 — Arm (b), Algorithm 2 with a plug-in point estimate
+**Built.** Prediction function fixed by **D-048** (equation (3), score 1 − π̂,
+deterministic, empty sets reported). `src/conformal/split_conformal.py` (equation (4),
+Mondrian) and the harness `src/conformal/poc.py`, whose calibration sets take exactly
+the C0 test split's counts (481 / 11,351 / 1,421 / 786), the operating point of
+D-042's frontier. `python -m src.conformal.poc` reproduces the table below.
+
+**Gate: passed.** T = I, α = 0.10, 100 repetitions, 20,000 test points each,
+separability 2.0. Coverage against the clean label (mean ± SE over repetitions):
+
+| condition | coverage | mean set size | empty-set rate |
+|---|---|---|---|
+| bipolar | 0.8994 ± 0.0017 | 1.241 | 0.0011 |
+| depression | 0.9002 ± 0.0003 | 1.243 | 0.0010 |
+| eating disorder | 0.9003 ± 0.0010 | 1.242 | 0.0009 |
+| schizophrenia | 0.9000 ± 0.0015 | 1.242 | 0.0011 |
+
+Theory puts each mean in [0.900, 0.900 + 1/(n_k + 1)]; all four sit within one SE of
+it. The pinned test (`tests/test_conformal_split_conformal.py`) uses smaller counts and
+200 repetitions, with a tolerance of three SEs either side of that interval.
+
+### Step 6 — Arm (b), Algorithm 2 with a plug-in point estimate. ✅ DONE 2026-10-26
 
 Two sub-runs, both diagnostic:
 
@@ -289,7 +379,80 @@ Two sub-runs, both diagnostic:
 Sub-run 2 is the argument for a region, made on synthetic data where the truth is
 known. It is worth having on its own.
 
-### Step 7 — PRE-REGISTER before arm (c) runs
+**Configuration and expectation, fixed 2026-10-26 before any arm (b) number exists.**
+Truth `T = make_transition(0.15, 0.0)`: bipolar → depression 15%, no other
+off-diagonal (the generator defaults committed at step 4, `db1a3c4`). Oracle point: the
+true `T`. Wrong point: `make_transition(0.046, 0.0)`. Both are converted to V with the
+population noisy prior `Tᵀρ`, which stands in for the corpus-wide proxy frequencies a
+practitioner would observe; the fixed-count calibration set's own frequencies are not
+used. α = 0.10, calibration counts as in step 5, 100 repetitions, separability 2.0.
+Each arm is reported as conservative (equation (22)) and optimistic (equation (25)),
+per D-049, with arm (a) alongside.
+
+*Expectation, from D-047's inflow argument.* With bipolar → depression as the only
+off-diagonal, every post labelled bipolar is truly bipolar: the bipolar row of M is
+(1, 0, 0, 0) under both the truth and the wrong point, and bipolar's calibration set is
+uncontaminated. Bipolar coverage should therefore be nominal in every arm (above it for
+the conservative variant), and the wrong point should **not** break it. The only
+contaminated calibration set is depression's, about 0.7% truly bipolar posts, so any
+arm differences should be small and confined there. If this holds, sub-run 2 does not
+make the argument for a region in this configuration, which contradicts the roadmap's
+"coverage should break". No configuration with inflow into a rare label is run here;
+choosing one is for D-043 to pre-register. Proposition 3's condition is measured
+without a prediction (D-049).
+
+**Built.** `src/conformal/adaptive.py` ports Algorithm 2 from equations (12) and (15)
+to (22) and (25), checked term by term against `cln/classification.py` (MIT), reusing
+`v_region.correction_term` for δ_ci. Two documented choices: ζ̂^upp defaults to the
+row's widest interval, a valid bound from the box that is zero for a point estimate,
+and δ̂^(V)_k* is taken per row as equation (19) defines it, where `cln` takes the
+matrix-wide maximum. `python -m src.conformal.poc --step 6` reproduces the tables;
+`tests/test_conformal_poc.py` pins them, and `tests/test_conformal_adaptive.py` holds
+the gates.
+
+**Gates: passed.** At T = I the optimistic variant equals arm (a) exactly, and the
+conservative variant sits at rank ⌈n_k(1 − α + c(n_k))⌉ (D-049's corrected gate). With
+a point estimate, Algorithm 2 reproduces an independent implementation of equations
+(13) to (17), confirming D-049's reduction to Algorithm 1.
+
+**Result.** V's only off-diagonal is depression's row: −0.0070 (oracle), −0.0019
+(wrong point). Coverage against the clean label, mean ± SE over 100 repetitions:
+
+| arm | bipolar | depression | eating disorder | schizophrenia | mean set size |
+|---|---|---|---|---|---|
+| (a) noise-blind | 0.9005 ± 0.0018 | 0.9059 ± 0.0003 | 0.9004 ± 0.0009 | 0.9016 ± 0.0014 | 1.250 to 1.252 |
+| (b) oracle, conservative | 0.9269 ± 0.0016 | 0.9075 ± 0.0003 | 0.9171 ± 0.0009 | 0.9217 ± 0.0013 | 1.325 to 1.333 |
+| (b) oracle, optimistic | identical to (a) | | | | 1.250 to 1.252 |
+| (b) wrong point, conservative | 0.9269 ± 0.0016 | 0.9106 ± 0.0003 | 0.9171 ± 0.0009 | 0.9217 ± 0.0013 | 1.329 to 1.336 |
+| (b) wrong point, optimistic | identical to (a) | | | | 1.250 to 1.252 |
+
+No full sets in any arm; empty-set rates are at most 0.0010.
+
+1. **Oracle: coverage holds** in both variants, as the roadmap expected.
+2. **Wrong point: coverage does not break**, as expected before the run and contrary to
+   the roadmap's original text. Bipolar's coverage is identical under both points, and
+   under-estimating the noise makes the conservative variant cover depression *more*
+   (0.9106 against 0.9075), because it corrects less in a regime where noise already
+   makes standard conformal conservative (Corollary 1).
+3. **The optimistic variant is exactly arm (a)** on every repetition, for both points:
+   Δ̂ never exceeds δ_ci, so equation (25) always selects −(1 − α)/n_k.
+4. **The conservative variant is strictly less informative than arm (a)** at the C0
+   calibration counts: thresholds higher on every repetition, mean set size 1.33 against
+   1.25, and bipolar over-covered by 2.7 points. That is the c(n_k) price, paid with no
+   noise correction to offset it in this configuration.
+5. **Proposition 3 fails on every repetition in both forms**, for both points, and the
+   optimistic variant does not under-cover. The condition is sufficient, not necessary,
+   and its failure did not cost coverage here. Bipolar's inf Δ of −0.0006 is Monte Carlo
+   error: with no inflow its true Δ is zero.
+
+**What this means for the argument.** Sub-run 2 does not make the argument for a region
+in this configuration, because a wrong point only matters where it misstates *inflow*
+into a label (D-047). A configuration with inflow into a rare label is the case to
+pre-register in D-043. Points 3 and 4 also bear on D-032's head-to-head: at these
+calibration counts, arm (b) or (c) must recover more than c(n_k) before the
+conservative variant can beat arm (a) on set size.
+
+### Step 7 — PRE-REGISTER before arm (c) runs. ✅ DONE 2026-10-26 (D-043, cf12627)
 
 Write **D-043** in DECISIONS.md fixing branches and thresholds *before the numbers
 exist*. (D-043 is the number D-042 reserved for this pre-registration; D-044 and D-045
@@ -311,12 +474,27 @@ should pre-register the quantities the closed form cannot give:
 That last row matters: it turns Step 3 into a falsifiable prediction rather than a
 derivation nobody tested.
 
-### Step 8 — Arm (c), region input at the real width
+### Step 8 — Arm (c), region input at the real width. ✅ DONE 2026-10-26 (D-046)
 
 Feed the region A and region B boxes from `c2-interface.md` §6. Measure per-class
 coverage, mean set size, and the full-set rate. Fire the D-043 branches.
 
-### Step 9 — The sweep, now a check on Step 3
+**Result.** `src/conformal/arm_c.py` (5c17e6b, 0758618) ran all seven regions under
+D-043.
+
+- **Closed-form guarantees: all held.** That covers the five certain cells and 28 of 28
+  flip brackets.
+- **Secondary admissibility calls: 3 held, 15 falsified, 5 split.**
+- **D-042 / D-047 "ok" verdicts: 17 confirmed, 5 split, 0 overturned.**
+- **Head-to-head: not won.**
+- **Arm (a) against arm (c).** Arm (a) was valid in every cell, with mean set size 1.33 to
+  1.88. Arm (c) was also valid, but with mean set size 2.79 to 3.98 and full-set rate 0.11
+  to 0.98.
+
+Informativeness was not pre-registered, so D-043's "C2 proceeds as D-047 scoped it" is
+not established. D-050 fixes the criterion.
+
+### Step 9 — The sweep, now a check on Step 3. ◐ α SWEEP DONE (D-046 §3); width and heterogeneity sweeps wait for D-050
 
 Sweep region width from 0 (a point estimate) upward and compare the measured
 degeneracy point against the closed-form frontier from Step 3. Run D-032's
@@ -326,7 +504,7 @@ noise-heterogeneity sweep on the same harness.
 width w*, and this project's proxy noise sits above it" is a publishable finding even
 if arm (c) loses, and Step 1 has already located w* to within a transcription.
 
-### Step 10 — Write the result up as D-046
+### Step 10 — Write the result up as D-046. ◐ DRAFTED 2026-10-26, awaiting review
 
 Branch fired, predictions held or missed, and the consequence for C2's scope. Update
 the reversal scoreboard either way.
@@ -360,11 +538,12 @@ and the degradation curves.
   any branch, but they belong in the entry.
 - **D-031 is still OPEN** (prune or do not prune the elicited set). Needs a decision
   before Chapter 4, ideally with the supervisor. It does not block the POC.
-- **Open item 6, elicitation sources, is the long pole after the POC.** The three
-  directional claims (bipolar → depression dominates, schizophrenia's diagonal is
-  lower, depression's is highest) are currently stated from general knowledge and each
-  needs a citation to a specific study. Where the literature is thin the range goes
-  wide, and the envelope propagates that width honestly.
+- **Open item 6, elicitation sources, re-scoped by D-047.** The three directional
+  claims (bipolar → depression dominates, schizophrenia's diagonal is lower,
+  depression's is highest) turn out to constrain entries the budget barely sees; they
+  remain useful for setting wide ranges there. The binding quantity is the worst-case
+  PPV of each rare label, for which no subreddit-level study exists. Open item 13 lists
+  the PDFs still to read; open item 14 is the direction decision.
 - **4 of 6 POC conditions have data.** `anxiety` and `suicidality` are absent; the
   split code warns rather than fails. No code change needed to add them.
 - **Class imbalance ~24:1** is why macro-F1 is the headline metric, and it is also why
@@ -400,6 +579,20 @@ result is well designed, and D-032 says that should be stated in the defence.
 
 ## 8. Document history
 
+- **2026-10-26** — Steps 7 and 8 done. D-043 committed (cf12627); arm (c) run and
+  scored (5c17e6b, 0758618); D-046 drafted with the D-043 gap note and the scoreboard
+  update. Width and heterogeneity sweeps deferred to D-050.
+- **2026-10-26** — Step 6 done: Algorithm 2 ported, both variants; gates pass. Wrong
+  point did not break coverage (expected before the run, contrary to the original
+  roadmap text); optimistic variant reduced exactly to arm (a); Proposition 3 failed
+  in both forms without under-coverage.
+- **2026-10-26** — Step 5 done: arm (a) built under D-048; T = I gate passes (coverage
+  nominal for all four conditions). D-049 recorded; step 4's gate text corrected.
+- **2026-10-26** — Step 4 done: synthetic generator with known `T`; T = I gate and the
+  ρ-recovery check pass (D-028 amendment; open item 3 stays open).
+- **2026-10-08** — Step 3b scoped (D-047): binding quantity identified as rare-label
+  PPV; `src/conformal/elicited_region.py` and `Docs/c2-elicitation-scoping.md` added;
+  §0, §2, §3, §5 and §6 updated.
 - **2026-10-01** — Housekeeping: Step 7 pre-registration renumbered D-042 → D-043 (the
   number D-042 reserved), Step 10 write-up → D-046; stale "commit D-041" open item
   removed.
